@@ -858,6 +858,14 @@ body {
         <label class="field-label">Data</label>
         <input class="field-input" type="date" id="meta-date">
       </div>
+      <div>
+        <label class="field-label">Quem pagou?</label>
+        <select class="field-input" id="meta-payer"></select>
+      </div>
+      <div>
+        <label class="field-label">Cartão/Forma</label>
+        <input class="field-input" type="text" id="meta-method" placeholder="Ex: Cartão Nubank">
+      </div>
     </div>
 
     <div class="products-wrap">
@@ -902,7 +910,7 @@ body {
 <!-- ══ REPORT ══ -->
 <div id="page-report" class="page">
   <div class="page-title">Relatório</div>
-  <div class="page-sub">Resumo mensal de gastos.</div>
+  <div class="page-sub">Resumo mensal e Acerto de Contas.</div>
   <select class="report-month-sel" id="report-month" onchange="renderReport()">
     <option value="">Selecione o mês</option>
   </select>
@@ -1014,6 +1022,16 @@ function setSyncStatus(s) {
   if (d) d.className = 'sync-dot ' + s;
 }
 
+// ── Payer Dropdown Update ──
+function updatePayerSelect() {
+  const names = getNames();
+  const sel = document.getElementById('meta-payer');
+  if(sel) {
+    sel.innerHTML = `<option value="him">${names.him}</option><option value="her">${names.her}</option>`;
+  }
+}
+window.updatePayerSelect = updatePayerSelect;
+
 // ── FIREBASE: configurações ──
 async function loadSettings() {
   try {
@@ -1086,7 +1104,7 @@ function verificarSenha() {
   const input = document.getElementById('senha-input').value;
   if (input === appSettings.password) {
     document.getElementById('login-erro').style.display = 'none';
-    sessionStorage.setItem('casal_auth', 'ok');
+    localStorage.setItem('casal_auth', 'ok');
     liberarAcesso();
   } else {
     document.getElementById('login-erro').style.display = 'block';
@@ -1101,7 +1119,7 @@ function liberarAcesso() {
 }
 
 function logout() {
-  sessionStorage.removeItem('casal_auth');
+  localStorage.removeItem('casal_auth');
   location.reload();
 }
 window.logout = logout;
@@ -1112,7 +1130,7 @@ async function boot() {
   document.getElementById('senha-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') verificarSenha();
   });
-  if (sessionStorage.getItem('casal_auth') === 'ok') liberarAcesso();
+  if (localStorage.getItem('casal_auth') === 'ok') liberarAcesso();
 }
 
 // ── INIT APP ──
@@ -1122,6 +1140,8 @@ async function initApp() {
   document.getElementById('name-him').value          = appSettings.him;
   document.getElementById('name-her').value          = appSettings.her;
   document.getElementById('meta-date').value         = today();
+
+  updatePayerSelect(); // Atualiza os nomes no select de pagamento
 
   const zone = document.getElementById('upload-zone');
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
@@ -1157,6 +1177,7 @@ window.saveApiKeySettings = saveApiKeySettings;
 function saveNames() {
   appSettings.him = document.getElementById('name-him').value || 'Eu';
   appSettings.her = document.getElementById('name-her').value || 'Ela';
+  updatePayerSelect(); // Atualiza os nomes no select caso tenha mudado
   saveSettingsToCloud();
 }
 window.saveNames = saveNames;
@@ -1231,6 +1252,7 @@ function resetUpload() {
   document.getElementById('products-section').style.display = 'none';
   document.getElementById('upload-zone').style.display      = 'block';
   document.getElementById('upload-zone').querySelector('input').value = '';
+  document.getElementById('meta-method').value = '';
 }
 window.resetUpload = resetUpload;
 
@@ -1409,6 +1431,8 @@ async function saveReceipt() {
     id:          Date.now(),
     store:       document.getElementById('meta-store').value.trim() || 'Sem nome',
     date:        document.getElementById('meta-date').value || today(),
+    payer:       document.getElementById('meta-payer').value || 'him',
+    method:      document.getElementById('meta-method').value.trim(),
     items:       currentProducts.map(p => ({...p})),
     himCents:    himC,
     herCents:    herC,
@@ -1501,12 +1525,17 @@ function renderHistory() {
 
     const imgSrc = r.imageBase64 ? `data:${r.imageMime||'image/jpeg'};base64,${r.imageBase64}` : '';
     const fid    = r._fireId;
+    
+    const payerName = r.payer === 'him' ? names.him : (r.payer === 'her' ? names.her : '');
+    const methodStr = r.method ? ` (${r.method})` : '';
+    const paymentInfo = payerName ? `<div style="font-size:0.7rem; color:var(--muted2); margin-top:0.3rem;">Pago por: <strong>${payerName}</strong>${methodStr}</div>` : '';
 
     return `<div class="receipt-card">
       <div class="receipt-head" onclick="toggleCard('${fid}')">
         <div>
           <div class="receipt-store">${r.store}</div>
           <div class="receipt-date">${dateStr}</div>
+          ${paymentInfo}
         </div>
         <div class="receipt-amounts">
           <div class="receipt-amount-item">
@@ -1555,15 +1584,30 @@ function renderReport() {
 
   const names = getNames();
   let himC = 0, herC = 0, otherC = 0;
+  let himPaidCents = 0, herPaidCents = 0;
   const storeMap = {};
 
   list.forEach(r => {
     const rHimC   = r.himCents   !== undefined ? r.himCents   : cents(r.himTotal   || 0);
     const rHerC   = r.herCents   !== undefined ? r.herCents   : cents(r.herTotal   || 0);
     const rOtherC = r.otherCents !== undefined ? r.otherCents : cents(r.otherTotal || 0);
+    const rTotalC = r.totalCents !== undefined ? r.totalCents : (rHimC + rHerC + rOtherC);
+    
     himC   += rHimC;
     herC   += rHerC;
     otherC += rOtherC;
+    
+    // Cálculo de quem pagou a conta de verdade
+    if (r.payer === 'him') {
+      himPaidCents += rTotalC;
+    } else if (r.payer === 'her') {
+      herPaidCents += rTotalC;
+    } else {
+      // Para cupons antigos (antes de ter a opção "Quem pagou"), assume que cada um pagou a sua parte exata.
+      himPaidCents += rHimC;
+      herPaidCents += rHerC;
+    }
+
     if (!storeMap[r.store]) storeMap[r.store] = { himC: 0, herC: 0 };
     storeMap[r.store].himC += rHimC;
     storeMap[r.store].herC += rHerC;
@@ -1573,6 +1617,35 @@ function renderReport() {
   const grandC  = coupleC + otherC;
   const himPct  = coupleC > 0 ? Math.round(himC / coupleC * 100) : 0;
   const herPct  = 100 - himPct;
+  
+  // Cálculo do Acerto de Contas (Quem deve quem)
+  const himBalanceCents = himPaidCents - himC;
+  let settlementHTML = '';
+  
+  if (himBalanceCents > 0) {
+     settlementHTML = `<div class="card" style="margin-bottom:1rem; border-color: var(--both);">
+       <div class="card-header" style="color: var(--both);">🤝 Acerto de Contas do Mês</div>
+       <div style="padding:1.25rem; text-align:center;">
+         <div style="font-size:0.85rem; color:var(--muted2); margin-bottom:0.5rem;">${names.her} deve pagar para ${names.him}</div>
+         <div style="font-size:1.8rem; font-weight:800; color:var(--both);">${fmt(fromCents(himBalanceCents))}</div>
+       </div>
+     </div>`;
+  } else if (himBalanceCents < 0) {
+     settlementHTML = `<div class="card" style="margin-bottom:1rem; border-color: var(--her);">
+       <div class="card-header" style="color: var(--her);">🤝 Acerto de Contas do Mês</div>
+       <div style="padding:1.25rem; text-align:center;">
+         <div style="font-size:0.85rem; color:var(--muted2); margin-bottom:0.5rem;">${names.him} deve pagar para ${names.her}</div>
+         <div style="font-size:1.8rem; font-weight:800; color:var(--her);">${fmt(fromCents(Math.abs(himBalanceCents)))}</div>
+       </div>
+     </div>`;
+  } else {
+     settlementHTML = `<div class="card" style="margin-bottom:1rem;">
+       <div class="card-header">🤝 Acerto de Contas do Mês</div>
+       <div style="padding:1.25rem; text-align:center;">
+         <div style="font-size:1rem; font-weight:700; color:var(--muted2);">Tudo quite! Ninguém deve nada.</div>
+       </div>
+     </div>`;
+  }
 
   const storeRows = Object.entries(storeMap)
     .sort((a,b) => (b[1].himC + b[1].herC) - (a[1].himC + a[1].herC))
@@ -1600,13 +1673,15 @@ function renderReport() {
     }).join('');
 
   container.innerHTML = `
+    ${settlementHTML}
+    
     <div class="stat-grid">
       <div class="stat-card">
-        <div class="stat-label">${names.him}</div>
+        <div class="stat-label">${names.him} Consumiu</div>
         <div class="stat-value" style="color:var(--him)">${fmt(fromCents(himC))}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">${names.her}</div>
+        <div class="stat-label">${names.her} Consumiu</div>
         <div class="stat-value" style="color:var(--her)">${fmt(fromCents(herC))}</div>
       </div>
       <div class="stat-card">
