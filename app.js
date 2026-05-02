@@ -445,8 +445,9 @@ window.extractWithGemini = async function() {
     if (data.error) throw new Error(data.error.message);
 
     let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    text = text.replace(/```json/g, '').replace(/
-```/g, '').trim();
+    
+    // LINHA CORRIGIDA DE FORMA 100% SEGURA
+    text = text.split('```json').join('').split('```').join('').trim();
 
     const parsed = JSON.parse(text);
 
