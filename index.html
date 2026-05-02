@@ -6,7 +6,7 @@
 <title>Gastos do Casal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<!-- Importa o CSS separadamente para carregar mais rápido -->
+<!-- Importando o CSS -->
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,7 +14,7 @@
 <!-- TELA DE LOGIN -->
 <div id="login-screen" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#0f111a;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:9999;font-family:sans-serif;">
   <h2 style="color:white;margin-bottom:20px;">🔒 Gastos Casal</h2>
-  <input type="password" id="senha-input" placeholder="Senha de acesso" style="padding:12px;border-radius:8px;border:none;margin-bottom:10px;width:250px;background:#1e2130;color:white;outline:none;" onkeydown="if(event.key==='Enter') window.verificarSenha()">
+  <input type="password" id="senha-input" placeholder="Senha de acesso" style="padding:12px;border-radius:8px;border:none;margin-bottom:10px;width:250px;background:#1e2130;color:white;outline:none;" onkeydown="if(event.key==='Enter')window.verificarSenha()">
   <button onclick="window.verificarSenha()" style="padding:12px 20px;background:#3b82f6;color:white;border:none;border-radius:8px;cursor:pointer;width:250px;font-weight:bold;">Acessar</button>
   <p id="login-erro" style="color:#ef4444;margin-top:15px;display:none;">Senha incorreta!</p>
 </div>
@@ -29,7 +29,7 @@
   <div style="display:flex;align-items:center;gap:0.75rem">
     <div class="sync-dot" id="sync-dot" title="Status da sincronização"></div>
     <nav class="desktop-nav">
-      <button class="desktop-nav-btn active" onclick="window.showPage('add',this)">＋ Cupom</button>
+      <button class="desktop-nav-btn active" onclick="window.showPage('add',this)">＋ Gastos</button>
       <button class="desktop-nav-btn" onclick="window.showPage('history',this)">Histórico</button>
       <button class="desktop-nav-btn" onclick="window.showPage('report',this)">Relatório</button>
       <button class="desktop-nav-btn" onclick="window.showPage('settings',this)">Config</button>
@@ -39,8 +39,47 @@
 
 <!-- ══ ADD ══ -->
 <div id="page-add" class="page active">
-  <div class="page-title">Novo Cupom</div>
-  <div class="page-sub">Fotografe o cupom e a IA extrai os produtos automaticamente.</div>
+  
+  <!-- Lançamento Rápido / Empréstimo -->
+  <div class="card" style="margin-bottom: 2rem; border-color: var(--other);">
+    <div class="card-header" style="color: var(--other);">💸 Lançamento Rápido / Empréstimo</div>
+    <div style="padding: 1.25rem;">
+      <div class="meta-grid">
+        <div style="grid-column: span 2;">
+          <label class="field-label">O que é?</label>
+          <input class="field-input" id="quick-desc" placeholder="Ex: Empréstimo João, Lanche, Uber...">
+        </div>
+        <div>
+          <label class="field-label">Valor</label>
+          <input class="field-input" type="number" step="0.01" min="0" id="quick-price" placeholder="R$ 0,00">
+        </div>
+        <div>
+          <label class="field-label">Quem pagou?</label>
+          <select class="field-input" id="quick-payer"></select>
+        </div>
+        <div style="grid-column: span 2;">
+          <label class="field-label">Para quem?</label>
+          <select class="field-input" id="quick-split" onchange="document.getElementById('quick-other-div').style.display = this.value === 'other' ? 'block' : 'none'">
+            <option value="both">Dividir entre o Casal</option>
+            <option value="him">Só pra mim</option>
+            <option value="her">Só pra ela</option>
+            <option value="other">Emprestado (Terceiro)</option>
+          </select>
+        </div>
+        <div id="quick-other-div" style="grid-column: span 2; display: none;">
+          <label class="field-label">Nome de quem pegou emprestado</label>
+          <input class="field-input" id="quick-other-name" placeholder="Ex: Marcos, Mãe, etc...">
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%; margin-top:1rem; background: var(--other); color: #000;" onclick="window.saveQuickExpense()">💾 Salvar Lançamento</button>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Cupom Normal -->
+  <div class="page-title" style="margin-top: 1.5rem;">Ler Cupom Fiscal</div>
+  <div class="page-sub">Fotografe o cupom de mercado e a IA extrai tudo.</div>
 
   <div class="api-banner" id="api-banner">
     <div class="api-banner-title">🔑 Chave Google Gemini (gratuita)</div>
@@ -115,7 +154,7 @@
 <!-- ══ HISTORY ══ -->
 <div id="page-history" class="page">
   <div class="page-title">Histórico</div>
-  <div class="page-sub">Todos os cupons salvos na nuvem.</div>
+  <div class="page-sub">Todos os cupons e lançamentos na nuvem.</div>
   <div class="filter-bar">
     <select class="filter-select" id="filter-month" onchange="window.renderHistory()">
       <option value="">Todos os meses</option>
@@ -185,7 +224,7 @@
 <nav class="bottom-nav">
   <button class="nav-item active" id="nav-add" onclick="window.showPage('add',null,'nav-add')">
     <span class="nav-icon">＋</span>
-    <span>Cupom</span>
+    <span>Gastos</span>
   </button>
   <button class="nav-item" id="nav-history" onclick="window.showPage('history',null,'nav-history')">
     <span class="nav-icon">🧾</span>
@@ -205,7 +244,7 @@
 
 <div class="toast" id="toast"></div>
 
-<!-- Importa o JS separadamente no final -->
+<!-- Importando o Javascript separado como módulo -->
 <script type="module" src="app.js"></script>
 </body>
 </html>
