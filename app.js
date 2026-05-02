@@ -99,6 +99,27 @@ async function deleteReceiptFromCloud(fireId) {
   }
 }
 
+// ── ALTERAR STATUS DE PAGO/EM ABERTO ──
+window.toggleReceiptStatus = async function(fireId) {
+  const receipt = allReceipts.find(r => r._fireId === fireId);
+  if (!receipt) return;
+  
+  const newStatus = receipt.status === 'paid' ? 'open' : 'paid';
+  
+  setSyncStatus('syncing');
+  try {
+    await setDoc(doc(db, 'receipts', fireId), { status: newStatus }, { merge: true });
+    receipt.status = newStatus;
+    setSyncStatus('ok');
+    window.renderHistory();
+    window.renderReport();
+    window.showToast(newStatus === 'paid' ? '✅ Conta Paga!' : '🔄 Conta Reaberta!');
+  } catch(e) {
+    setSyncStatus('err');
+    window.showToast('❌ Erro ao atualizar status.');
+  }
+};
+
 window.verificarSenha = function() {
   const input = document.getElementById('senha-input').value;
   if (input === appSettings.password) {
@@ -132,7 +153,7 @@ async function initApp() {
 
   const zone = document.getElementById('upload-zone');
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
-  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'); });
   zone.addEventListener('drop', e => {
     e.preventDefault(); zone.classList.remove('dragover');
     if (e.dataTransfer.files[0]) window.loadFile(e.dataTransfer.files[0]);
@@ -174,6 +195,7 @@ window.saveQuickExpense = async function() {
     date: today(),
     payer: payer,
     method: 'Avulso',
+    status: 'open', // NOVO: Sempre entra como "Em Aberto"
     items: [item],
     himCents: himC, herCents: herC, otherCents: otherC, coupleCents: himC + herC, totalCents: himC + herC + otherC,
     imageBase64: null, imageMime: null,
@@ -302,7 +324,8 @@ window.extractWithGemini = async function() {
     if (data.error) throw new Error(data.error.message);
 
     let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    text = text.replace(/```json|```/g, '').trim();
+    text = text.replace(/
+```json|```/g, '').trim();
     const parsed = JSON.parse(text);
 
     currentProducts = parsed.items.map(item => ({
@@ -421,6 +444,7 @@ window.saveReceipt = async function() {
     id: Date.now(), store: document.getElementById('meta-store').value.trim() || 'Sem nome',
     date: document.getElementById('meta-date').value || today(),
     payer: document.getElementById('meta-payer').value || 'him', method: document.getElementById('meta-method').value.trim(),
+    status: 'open', // NOVO: Sempre entra como "Em Aberto"
     items: currentProducts.map(p => ({...p})),
     himCents: himC, herCents: herC, otherCents: otherC, coupleCents: himC + herC, totalCents: himC + herC + otherC,
     imageBase64: currentBase64, imageMime: currentMime, names: { him: names.him, her: names.her }, createdAt: Date.now()
@@ -471,6 +495,12 @@ window.renderHistory = function() {
     const himC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0);
     const herC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
     const otherC = r.otherCents !== undefined ? r.otherCents : cents(r.otherTotal || 0);
+    
+    // NOVO: Design do Status
+    const isPaid = r.status === 'paid';
+    const statusBadge = isPaid 
+      ? `<span style="background:var(--both-bg); color:var(--both); padding:0.15rem 0.4rem; border-radius:10px; font-size:0.65rem; font-weight:800; margin-left:0.5rem;">✅ PAGO</span>` 
+      : `<span style="background:var(--other-bg); color:var(--other); padding:0.15rem 0.4rem; border-radius:10px; font-size:0.65rem; font-weight:800; margin-left:0.5rem;">⏳ EM ABERTO</span>`;
 
     const itemRows = r.items.map(item => {
       const iC = item.priceCents !== undefined ? item.priceCents : cents(item.price || 0);
@@ -485,9 +515,13 @@ window.renderHistory = function() {
     const methodStr = r.method ? ` (${r.method})` : '';
     const paymentInfo = payerName ? `<div style="font-size:0.7rem; color:var(--muted2); margin-top:0.3rem;">Pago por: <strong>${payerName}</strong>${methodStr}</div>` : '';
 
-    return `<div class="receipt-card">
+    return `<div class="receipt-card" style="${isPaid ? 'opacity: 0.7;' : ''}">
       <div class="receipt-head" onclick="window.toggleCard('${fid}')">
-        <div><div class="receipt-store">${r.store}</div><div class="receipt-date">${dateStr}</div>${paymentInfo}</div>
+        <div>
+          <div class="receipt-store">${r.store}</div>
+          <div class="receipt-date" style="display:flex; align-items:center; margin-top:0.25rem;">${dateStr} ${statusBadge}</div>
+          ${paymentInfo}
+        </div>
         <div class="receipt-amounts">
           <div class="receipt-amount-item"><div class="amount-dot" style="background:var(--him)"></div><span style="color:var(--him)">${fmt(fromCents(himC))}</span></div>
           <div class="receipt-amount-item"><div class="amount-dot" style="background:var(--her)"></div><span style="color:var(--her)">${fmt(fromCents(herC))}</span></div>
@@ -497,7 +531,10 @@ window.renderHistory = function() {
       <div class="receipt-body" id="card-body-${fid}">
         ${imgSrc ? `<div class="receipt-img-wrap"><img src="${imgSrc}" alt="Cupom"></div>` : ''}
         <div class="receipt-items">${itemRows}</div>
-        <div class="receipt-actions"><button class="btn btn-danger btn-sm" onclick="window.deleteReceipt('${fid}')">🗑️ Apagar</button></div>
+        <div class="receipt-actions" style="gap: 0.8rem;">
+          <button class="btn ${isPaid ? 'btn-ghost' : 'btn-success'} btn-sm" onclick="window.toggleReceiptStatus('${fid}')">${isPaid ? '🔄 Reabrir' : '💸 Marcar como Pago'}</button>
+          <button class="btn btn-danger btn-sm" onclick="window.deleteReceipt('${fid}')">🗑️ Apagar</button>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -525,21 +562,24 @@ window.renderReport = function() {
     const rOtherC = r.otherCents !== undefined ? r.otherCents : cents(r.otherTotal || 0);
     himC += rHimC; herC += rHerC; otherC += rOtherC;
     
-    if (r.payer === 'him') {
-      coupleBalanceCents += rHerC; 
-      if (r.items) {
-         r.items.filter(i => i.split === 'other').forEach(i => {
-           let n = i.otherName || 'Alguém';
-           thirdPartyDebts.him[n] = (thirdPartyDebts.him[n] || 0) + (i.priceCents !== undefined ? i.priceCents : cents(i.price));
-         });
-      }
-    } else if (r.payer === 'her') {
-      coupleBalanceCents -= rHimC; 
-      if (r.items) {
-         r.items.filter(i => i.split === 'other').forEach(i => {
-           let n = i.otherName || 'Alguém';
-           thirdPartyDebts.her[n] = (thirdPartyDebts.her[n] || 0) + (i.priceCents !== undefined ? i.priceCents : cents(i.price));
-         });
+    // NOVO: Dívida só conta se estiver EM ABERTO
+    if (r.status !== 'paid') {
+      if (r.payer === 'him') {
+        coupleBalanceCents += rHerC; 
+        if (r.items) {
+           r.items.filter(i => i.split === 'other').forEach(i => {
+             let n = i.otherName || 'Alguém';
+             thirdPartyDebts.him[n] = (thirdPartyDebts.him[n] || 0) + (i.priceCents !== undefined ? i.priceCents : cents(i.price));
+           });
+        }
+      } else if (r.payer === 'her') {
+        coupleBalanceCents -= rHimC; 
+        if (r.items) {
+           r.items.filter(i => i.split === 'other').forEach(i => {
+             let n = i.otherName || 'Alguém';
+             thirdPartyDebts.her[n] = (thirdPartyDebts.her[n] || 0) + (i.priceCents !== undefined ? i.priceCents : cents(i.price));
+           });
+        }
       }
     }
 
@@ -555,11 +595,11 @@ window.renderReport = function() {
   
   let settlementHTML = '';
   if (coupleBalanceCents > 0) {
-     settlementHTML = `<div class="card" style="margin-bottom:1rem; border-color: var(--both);"><div class="card-header" style="color: var(--both);">🤝 Acerto do Casal no Mês</div><div style="padding:1.25rem; text-align:center;"><div style="font-size:0.85rem; color:var(--muted2); margin-bottom:0.5rem;">${names.her} deve pagar para ${names.him}</div><div style="font-size:1.8rem; font-weight:800; color:var(--both);">${fmt(fromCents(coupleBalanceCents))}</div></div></div>`;
+     settlementHTML = `<div class="card" style="margin-bottom:1rem; border-color: var(--both);"><div class="card-header" style="color: var(--both);">🤝 Acerto do Casal no Mês</div><div style="padding:1.25rem; text-align:center;"><div style="font-size:0.85rem; color:var(--muted2); margin-bottom:0.5rem;">${names.her} deve pagar para ${names.him}</div><div style="font-size:1.8rem; font-weight:800; color:var(--both);">${fmt(fromCents(coupleBalanceCents))}</div><div style="font-size:0.7rem; color:var(--muted2); margin-top:0.5rem;">*Considera apenas contas Em Aberto</div></div></div>`;
   } else if (coupleBalanceCents < 0) {
-     settlementHTML = `<div class="card" style="margin-bottom:1rem; border-color: var(--her);"><div class="card-header" style="color: var(--her);">🤝 Acerto do Casal no Mês</div><div style="padding:1.25rem; text-align:center;"><div style="font-size:0.85rem; color:var(--muted2); margin-bottom:0.5rem;">${names.him} deve pagar para ${names.her}</div><div style="font-size:1.8rem; font-weight:800; color:var(--her);">${fmt(fromCents(Math.abs(coupleBalanceCents)))}</div></div></div>`;
+     settlementHTML = `<div class="card" style="margin-bottom:1rem; border-color: var(--her);"><div class="card-header" style="color: var(--her);">🤝 Acerto do Casal no Mês</div><div style="padding:1.25rem; text-align:center;"><div style="font-size:0.85rem; color:var(--muted2); margin-bottom:0.5rem;">${names.him} deve pagar para ${names.her}</div><div style="font-size:1.8rem; font-weight:800; color:var(--her);">${fmt(fromCents(Math.abs(coupleBalanceCents)))}</div><div style="font-size:0.7rem; color:var(--muted2); margin-top:0.5rem;">*Considera apenas contas Em Aberto</div></div></div>`;
   } else {
-     settlementHTML = `<div class="card" style="margin-bottom:1rem;"><div class="card-header">🤝 Acerto do Casal no Mês</div><div style="padding:1.25rem; text-align:center;"><div style="font-size:1rem; font-weight:700; color:var(--muted2);">Tudo quite! Ninguém deve nada ao outro.</div></div></div>`;
+     settlementHTML = `<div class="card" style="margin-bottom:1rem;"><div class="card-header">🤝 Acerto do Casal no Mês</div><div style="padding:1.25rem; text-align:center;"><div style="font-size:1rem; font-weight:700; color:var(--both);">Tudo quite! Ninguém deve nada.</div><div style="font-size:0.7rem; color:var(--muted2); margin-top:0.5rem;">*Considera apenas contas Em Aberto</div></div></div>`;
   }
 
   let thirdPartyHTML = ''; let hasDebts = false; let debtsRows = '';
@@ -570,7 +610,7 @@ window.renderReport = function() {
     hasDebts = true; debtsRows += `<div class="store-row" style="border-color:var(--border2)"><span>${name} <small style="color:var(--muted2)">(deve a ${names.her})</small></span><span style="color:var(--her); font-weight:800">${fmt(fromCents(amount))}</span></div>`;
   });
 
-  if (hasDebts) { thirdPartyHTML = `<div class="card" style="margin-bottom:1rem; border-color: var(--other);"><div class="card-header" style="color: var(--other);">👥 A Receber de Terceiros (Empréstimos)</div><div style="padding:0 1.25rem;">${debtsRows}</div></div>`; }
+  if (hasDebts) { thirdPartyHTML = `<div class="card" style="margin-bottom:1rem; border-color: var(--other);"><div class="card-header" style="color: var(--other);">👥 A Receber de Terceiros (Em Aberto)</div><div style="padding:0 1.25rem;">${debtsRows}</div></div>`; }
 
   const storeRows = Object.entries(storeMap).sort((a,b) => (b[1].himC + b[1].herC) - (a[1].himC + a[1].herC)).map(([store, v]) => `<div class="store-row"><span class="store-name">${store}</span><div class="store-amounts"><span style="color:var(--him)">${fmt(fromCents(v.himC))}</span><span style="color:var(--her)">${fmt(fromCents(v.herC))}</span></div></div>`).join('');
   const receiptRows = list.sort((a,b) => b.date.localeCompare(a.date)).map(r => {
@@ -584,9 +624,9 @@ window.renderReport = function() {
     ${settlementHTML}
     ${thirdPartyHTML}
     <div class="stat-grid">
-      <div class="stat-card"><div class="stat-label">${names.him} Consumiu</div><div class="stat-value" style="color:var(--him)">${fmt(fromCents(himC))}</div></div>
-      <div class="stat-card"><div class="stat-label">${names.her} Consumiu</div><div class="stat-value" style="color:var(--her)">${fmt(fromCents(herC))}</div></div>
-      <div class="stat-card"><div class="stat-label">Total Casal</div><div class="stat-value" style="color:var(--both)">${fmt(fromCents(coupleC))}</div></div>
+      <div class="stat-card"><div class="stat-label">${names.him} Consumiu no Mês</div><div class="stat-value" style="color:var(--him)">${fmt(fromCents(himC))}</div></div>
+      <div class="stat-card"><div class="stat-label">${names.her} Consumiu no Mês</div><div class="stat-value" style="color:var(--her)">${fmt(fromCents(herC))}</div></div>
+      <div class="stat-card"><div class="stat-label">Total Casal (Pago + Aberto)</div><div class="stat-value" style="color:var(--both)">${fmt(fromCents(coupleC))}</div></div>
       ${otherC > 0 ? `<div class="stat-card"><div class="stat-label">Terceiros Consumiram</div><div class="stat-value" style="color:var(--other)">${fmt(fromCents(otherC))}</div></div>` : `<div class="stat-card"><div class="stat-label">Total Geral Gasto</div><div class="stat-value">${fmt(fromCents(grandC))}</div></div>`}
     </div>
     <div class="card" style="margin-bottom:1rem">
@@ -597,7 +637,7 @@ window.renderReport = function() {
       </div>
     </div>
     <div class="card" style="margin-bottom:1rem"><div class="card-header">🏪 Onde vocês mais gastaram</div><div style="padding:0 1.25rem">${storeRows}</div></div>
-    <div class="card"><div class="card-header">🧾 ${list.length} cupons no mês</div><div style="padding:0 1.25rem">${receiptRows}</div></div>
+    <div class="card"><div class="card-header">🧾 ${list.length} contas no mês</div><div style="padding:0 1.25rem">${receiptRows}</div></div>
   `;
 };
 
