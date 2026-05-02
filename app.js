@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, deleteDoc, doc, setDoc, getDoc, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { collection, addDoc, getDocs, deleteDoc, doc, setDoc, getDoc, query, orderBy } from '[https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js](https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js)';
 import { db } from './firebase.js';
 
 let currentFile = null;
@@ -99,7 +99,6 @@ async function deleteReceiptFromCloud(fireId) {
   }
 }
 
-// ── ALTERAR STATUS DE PAGO/EM ABERTO ──
 window.toggleReceiptStatus = async function(fireId) {
   const receipt = allReceipts.find(r => r._fireId === fireId);
   if (!receipt) return;
@@ -310,7 +309,7 @@ window.extractWithGemini = async function() {
   document.getElementById('loading-box').style.display = 'flex';
 
   try {
-    const url  = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const url  = `[https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=$){apiKey}`;
     const body = {
       contents: [{ parts: [
         { inline_data: { mime_type: currentMime, data: currentBase64 } },
@@ -325,10 +324,9 @@ window.extractWithGemini = async function() {
 
     let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     
-    // LINHA CORRIGIDA PARA O VS CODE NÃO RECLAMAR:
-    text = text.replace(new RegExp('
-```json|```', 'g'), '').trim();
-    
+    // Expressão corrigida e 100% segura para o VS Code não surtar
+    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+
     const parsed = JSON.parse(text);
 
     currentProducts = parsed.items.map(item => ({
@@ -342,7 +340,7 @@ window.extractWithGemini = async function() {
     document.getElementById('products-section').style.display = 'block';
     window.showToast('✅ Extraído!');
   } catch(err) {
-    window.showToast('❌ ' + err.message);
+    window.showToast('❌ Erro na extração ou chave inválida.');
   } finally {
     document.getElementById('extract-btn').disabled = false;
     document.getElementById('loading-box').style.display = 'none';
@@ -447,7 +445,7 @@ window.saveReceipt = async function() {
     id: Date.now(), store: document.getElementById('meta-store').value.trim() || 'Sem nome',
     date: document.getElementById('meta-date').value || today(),
     payer: document.getElementById('meta-payer').value || 'him', method: document.getElementById('meta-method').value.trim(),
-    status: 'open',
+    status: 'open', 
     items: currentProducts.map(p => ({...p})),
     himCents: himC, herCents: herC, otherCents: otherC, coupleCents: himC + herC, totalCents: himC + herC + otherC,
     imageBase64: currentBase64, imageMime: currentMime, names: { him: names.him, her: names.her }, createdAt: Date.now()
@@ -534,7 +532,7 @@ window.renderHistory = function() {
         ${imgSrc ? `<div class="receipt-img-wrap"><img src="${imgSrc}" alt="Cupom"></div>` : ''}
         <div class="receipt-items">${itemRows}</div>
         <div class="receipt-actions" style="gap: 0.8rem;">
-          <button class="btn ${isPaid ? 'btn-ghost' : 'btn-success'} btn-sm" onclick="window.toggleReceiptStatus('${fid}')">${isPaid ? '🔄 Reabrir' : '💸 Marcar como Pago'}</button>
+          <button class="btn ${isPaid ? 'btn-ghost' : 'btn-success'} btn-sm" onclick="window.toggleReceiptStatus('${fid}')">${isPaid ? '🔄 Reabrir' : '💸 Marcar Pago'}</button>
           <button class="btn btn-danger btn-sm" onclick="window.deleteReceipt('${fid}')">🗑️ Apagar</button>
         </div>
       </div>
