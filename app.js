@@ -153,7 +153,7 @@ async function initApp() {
 
   const zone = document.getElementById('upload-zone');
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
-  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
   zone.addEventListener('drop', e => {
     e.preventDefault(); zone.classList.remove('dragover');
     if (e.dataTransfer.files[0]) window.loadFile(e.dataTransfer.files[0]);
@@ -195,7 +195,7 @@ window.saveQuickExpense = async function() {
     date: today(),
     payer: payer,
     method: 'Avulso',
-    status: 'open', // NOVO: Sempre entra como "Em Aberto"
+    status: 'open',
     items: [item],
     himCents: himC, herCents: herC, otherCents: otherC, coupleCents: himC + herC, totalCents: himC + herC + otherC,
     imageBase64: null, imageMime: null,
@@ -324,8 +324,11 @@ window.extractWithGemini = async function() {
     if (data.error) throw new Error(data.error.message);
 
     let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    text = text.replace(/
-```json|```/g, '').trim();
+    
+    // LINHA CORRIGIDA PARA O VS CODE NÃO RECLAMAR:
+    text = text.replace(new RegExp('
+```json|```', 'g'), '').trim();
+    
     const parsed = JSON.parse(text);
 
     currentProducts = parsed.items.map(item => ({
@@ -444,7 +447,7 @@ window.saveReceipt = async function() {
     id: Date.now(), store: document.getElementById('meta-store').value.trim() || 'Sem nome',
     date: document.getElementById('meta-date').value || today(),
     payer: document.getElementById('meta-payer').value || 'him', method: document.getElementById('meta-method').value.trim(),
-    status: 'open', // NOVO: Sempre entra como "Em Aberto"
+    status: 'open',
     items: currentProducts.map(p => ({...p})),
     himCents: himC, herCents: herC, otherCents: otherC, coupleCents: himC + herC, totalCents: himC + herC + otherC,
     imageBase64: currentBase64, imageMime: currentMime, names: { him: names.him, her: names.her }, createdAt: Date.now()
@@ -495,8 +498,7 @@ window.renderHistory = function() {
     const himC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0);
     const herC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
     const otherC = r.otherCents !== undefined ? r.otherCents : cents(r.otherTotal || 0);
-    
-    // NOVO: Design do Status
+
     const isPaid = r.status === 'paid';
     const statusBadge = isPaid 
       ? `<span style="background:var(--both-bg); color:var(--both); padding:0.15rem 0.4rem; border-radius:10px; font-size:0.65rem; font-weight:800; margin-left:0.5rem;">✅ PAGO</span>` 
@@ -561,8 +563,7 @@ window.renderReport = function() {
     const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
     const rOtherC = r.otherCents !== undefined ? r.otherCents : cents(r.otherTotal || 0);
     himC += rHimC; herC += rHerC; otherC += rOtherC;
-    
-    // NOVO: Dívida só conta se estiver EM ABERTO
+
     if (r.status !== 'paid') {
       if (r.payer === 'him') {
         coupleBalanceCents += rHerC; 
@@ -592,7 +593,7 @@ window.renderReport = function() {
   const grandC = coupleC + otherC;
   const himPct = coupleC > 0 ? Math.round(himC / coupleC * 100) : 0;
   const herPct = 100 - himPct;
-  
+
   let settlementHTML = '';
   if (coupleBalanceCents > 0) {
      settlementHTML = `<div class="card" style="margin-bottom:1rem; border-color: var(--both);"><div class="card-header" style="color: var(--both);">🤝 Acerto do Casal no Mês</div><div style="padding:1.25rem; text-align:center;"><div style="font-size:0.85rem; color:var(--muted2); margin-bottom:0.5rem;">${names.her} deve pagar para ${names.him}</div><div style="font-size:1.8rem; font-weight:800; color:var(--both);">${fmt(fromCents(coupleBalanceCents))}</div><div style="font-size:0.7rem; color:var(--muted2); margin-top:0.5rem;">*Considera apenas contas Em Aberto</div></div></div>`;
