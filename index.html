@@ -80,6 +80,20 @@ body {
   font-size: 0.85rem;
 }
 
+/* ── SYNC DOT ── */
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+.sync-dot.syncing { background: var(--other); animation: pulse 1s infinite; }
+.sync-dot.ok      { background: var(--both); }
+.sync-dot.err     { background: var(--her); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
 /* ── BOTTOM NAV (mobile first) ── */
 .bottom-nav {
   position: fixed;
@@ -275,7 +289,8 @@ body {
 }
 
 .spinner {
-  width: 24px; height: 24px;
+  width: 24px;
+  height: 24px;
   border: 2.5px solid var(--border2);
   border-top-color: var(--him);
   border-radius: 50%;
@@ -377,7 +392,7 @@ body {
 }
 
 /* ── SPLIT BUTTONS ── */
-.split-group { display: flex; gap: 0.3rem; }
+.split-group { display: flex; gap: 0.3rem; flex-wrap: wrap; }
 
 .split-btn {
   border: 1.5px solid var(--border2);
@@ -395,9 +410,9 @@ body {
 
 .split-btn:active { transform: scale(0.95); }
 
-.split-btn.s-him { background: var(--him-bg); border-color: var(--him); color: var(--him); }
-.split-btn.s-her { background: var(--her-bg); border-color: var(--her); color: var(--her); }
-.split-btn.s-both { background: var(--both-bg); border-color: var(--both); color: var(--both); }
+.split-btn.s-him   { background: var(--him-bg);   border-color: var(--him);   color: var(--him); }
+.split-btn.s-her   { background: var(--her-bg);   border-color: var(--her);   color: var(--her); }
+.split-btn.s-both  { background: var(--both-bg);  border-color: var(--both);  color: var(--both); }
 .split-btn.s-other { background: var(--other-bg); border-color: var(--other); color: var(--other); }
 
 .del-item-btn {
@@ -534,7 +549,7 @@ body {
 }
 
 .receipt-store { font-weight: 800; font-size: 0.95rem; letter-spacing: -0.3px; }
-.receipt-date { font-size: 0.75rem; color: var(--muted2); margin-top: 0.15rem; }
+.receipt-date  { font-size: 0.75rem; color: var(--muted2); margin-top: 0.15rem; }
 
 .receipt-amounts {
   display: flex;
@@ -553,7 +568,8 @@ body {
 }
 
 .amount-dot {
-  width: 7px; height: 7px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -599,9 +615,9 @@ body {
   flex-shrink: 0;
 }
 
-.badge-him { background: var(--him-bg); color: var(--him); }
-.badge-her { background: var(--her-bg); color: var(--her); }
-.badge-both { background: var(--both-bg); color: var(--both); }
+.badge-him   { background: var(--him-bg);   color: var(--him); }
+.badge-her   { background: var(--her-bg);   color: var(--her); }
+.badge-both  { background: var(--both-bg);  color: var(--both); }
 .badge-other { background: var(--other-bg); color: var(--other); }
 
 .receipt-actions {
@@ -626,7 +642,12 @@ body {
   appearance: none;
 }
 
-.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-bottom: 1rem; }
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
 
 .stat-card {
   background: var(--card);
@@ -635,14 +656,45 @@ body {
   padding: 1rem;
 }
 
-.stat-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: var(--muted2); margin-bottom: 0.4rem; }
-.stat-value { font-size: 1.4rem; font-weight: 800; letter-spacing: -1px; }
+.stat-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 700;
+  color: var(--muted2);
+  margin-bottom: 0.4rem;
+}
+
+.stat-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -1px;
+}
 
 .bar-section { margin-bottom: 1rem; }
+
 .bar-row { margin-bottom: 0.75rem; }
-.bar-label-row { display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.35rem; }
-.bar-track { height: 7px; background: var(--card2); border-radius: 4px; overflow: hidden; }
-.bar-fill { height: 100%; border-radius: 4px; transition: width 0.7s cubic-bezier(0.4,0,0.2,1); }
+
+.bar-label-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.bar-track {
+  height: 7px;
+  background: var(--card2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.7s cubic-bezier(0.4,0,0.2,1);
+}
 
 .store-row {
   display: flex;
@@ -696,7 +748,7 @@ body {
 }
 
 .api-banner-title { font-weight: 800; font-size: 0.9rem; margin-bottom: 0.2rem; }
-.api-banner-desc { font-size: 0.78rem; color: var(--muted2); margin-bottom: 0.6rem; line-height: 1.5; }
+.api-banner-desc  { font-size: 0.78rem; color: var(--muted2); margin-bottom: 0.6rem; line-height: 1.5; }
 
 /* ── DIVIDER ── */
 .divider {
@@ -737,26 +789,30 @@ body {
 </head>
 <body>
 
-    <!-- TELA DE LOGIN (Fica por cima de tudo) -->
-    <div id="login-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #0f111a; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; font-family: sans-serif;">
-        <h2 style="color: white; margin-bottom: 20px;">🔒 Gastos Casal</h2>
-        <input type="password" id="senha-input" placeholder="Senha de acesso" style="padding: 12px; border-radius: 8px; border: none; margin-bottom: 10px; width: 250px; background-color: #1e2130; color: white; outline: none;">
-        <button onclick="verificarSenha()" style="padding: 12px 20px; background-color: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; width: 250px; font-weight: bold;">Acessar</button>
-        <p id="login-erro" style="color: #ef4444; margin-top: 15px; display: none;">Senha incorreta!</p>
-    </div>
+<!-- TELA DE LOGIN -->
+<div id="login-screen" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#0f111a;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:9999;font-family:sans-serif;">
+  <h2 style="color:white;margin-bottom:20px;">🔒 Gastos Casal</h2>
+  <input type="password" id="senha-input" placeholder="Senha de acesso" style="padding:12px;border-radius:8px;border:none;margin-bottom:10px;width:250px;background:#1e2130;color:white;outline:none;" onkeydown="if(event.key==='Enter')verificarSenha()">
+  <button onclick="verificarSenha()" style="padding:12px 20px;background:#3b82f6;color:white;border:none;border-radius:8px;cursor:pointer;width:250px;font-weight:bold;">Acessar</button>
+  <p id="login-erro" style="color:#ef4444;margin-top:15px;display:none;">Senha incorreta!</p>
+</div>
 
-<div id="app-content" style="display: none;">
+<div id="app-content" style="display:none">
+
 <header class="header">
   <div class="logo">
     <div class="logo-icon">💰</div>
     Gastos Casal
   </div>
-  <nav class="desktop-nav">
-    <button class="desktop-nav-btn active" onclick="showPage('add',this)">＋ Cupom</button>
-    <button class="desktop-nav-btn" onclick="showPage('history',this)">Histórico</button>
-    <button class="desktop-nav-btn" onclick="showPage('report',this)">Relatório</button>
-    <button class="desktop-nav-btn" onclick="showPage('settings',this)">Config</button>
-  </nav>
+  <div style="display:flex;align-items:center;gap:0.75rem">
+    <div class="sync-dot" id="sync-dot" title="Status da sincronização"></div>
+    <nav class="desktop-nav">
+      <button class="desktop-nav-btn active" onclick="showPage('add',this)">＋ Cupom</button>
+      <button class="desktop-nav-btn" onclick="showPage('history',this)">Histórico</button>
+      <button class="desktop-nav-btn" onclick="showPage('report',this)">Relatório</button>
+      <button class="desktop-nav-btn" onclick="showPage('settings',this)">Config</button>
+    </nav>
+  </div>
 </header>
 
 <!-- ══ ADD ══ -->
@@ -829,7 +885,7 @@ body {
 <!-- ══ HISTORY ══ -->
 <div id="page-history" class="page">
   <div class="page-title">Histórico</div>
-  <div class="page-sub">Todos os cupons salvos.</div>
+  <div class="page-sub">Todos os cupons salvos na nuvem.</div>
   <div class="filter-bar">
     <select class="filter-select" id="filter-month" onchange="renderHistory()">
       <option value="">Todos os meses</option>
@@ -856,7 +912,7 @@ body {
 <!-- ══ SETTINGS ══ -->
 <div id="page-settings" class="page">
   <div class="page-title">Configurações</div>
-  <div class="page-sub">Seus dados ficam salvos só no navegador.</div>
+  <div class="page-sub">Dados salvos na nuvem — acessíveis em qualquer dispositivo.</div>
 
   <div class="card" style="margin-bottom:1rem">
     <div class="card-header">👤 Nomes</div>
@@ -870,7 +926,7 @@ body {
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" style="margin-bottom:1rem">
     <div class="card-header">🔑 API Key Gemini</div>
     <div class="settings-row">
       <input class="settings-input" type="password" id="api-key-settings" placeholder="AIza..." oninput="saveApiKeySettings()" style="flex:1">
@@ -880,8 +936,18 @@ body {
     </div>
   </div>
 
-  <div style="margin-top:1.5rem">
-    <button class="btn btn-danger btn-sm" onclick="clearAllData()">🗑️ Apagar todos os dados</button>
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-header">🔒 Segurança</div>
+    <div class="settings-row" style="display:block">
+      <label class="field-label">Nova senha de acesso</label>
+      <input class="settings-input" type="password" id="new-password" placeholder="Digite a nova senha..." style="margin-top:0.4rem">
+      <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" onclick="changePassword()">Alterar senha</button>
+    </div>
+  </div>
+
+  <div style="margin-top:1rem;display:flex;gap:0.75rem;flex-wrap:wrap">
+    <button class="btn btn-danger btn-sm" onclick="clearAllData()">🗑️ Apagar todos os cupons</button>
+    <button class="btn btn-ghost btn-sm" onclick="logout()">🚪 Sair</button>
   </div>
 </div>
 
@@ -904,130 +970,256 @@ body {
     <span>Config</span>
   </button>
 </nav>
-</div>
+
+</div><!-- fim #app-content -->
 
 <div class="toast" id="toast"></div>
 
-<script>
-// === LÓGICA DE LOGIN E PROTEÇÃO ===
-const SENHA_CORRETA = "15112018"; 
+<!-- ══ FIREBASE ══ -->
+<script type="module">
+import { initializeApp }      from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc,
+         setDoc, getDoc, query, orderBy }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-function verificarSenha() {
-    const input = document.getElementById('senha-input').value;
-    const erroMsg = document.getElementById('login-erro');
-
-    if (input === SENHA_CORRETA) {
-        erroMsg.style.display = 'none';
-        localStorage.setItem('casal_auth_token', 'liberado');
-        liberarAcesso();
-    } else {
-        erroMsg.style.display = 'block';
-        if (typeof showToast === "function") showToast("Senha incorreta!"); 
-    }
-}
-
-function liberarAcesso() {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app-content').style.display = 'block';
-    
-    // Inicialização do App
-    initApp();
-}
-
-window.onload = function() {
-    const estaLogado = localStorage.getItem('casal_auth_token');
-    
-    if (estaLogado === 'liberado') {
-        liberarAcesso();
-    } else {
-        console.log("Aguardando login para fazer chamadas à API...");
-    }
+const firebaseConfig = {
+  apiKey: "AIzaSyBuiykuiner0QGtalcKhdvsBqFDy95pn2Y",
+  authDomain: "gastos-casal-26c77.firebaseapp.com",
+  projectId: "gastos-casal-26c77",
+  storageBucket: "gastos-casal-26c77.firebasestorage.app",
+  messagingSenderId: "848606367047",
+  appId: "1:848606367047:web:f2b1243d4e2043239a9062"
 };
 
-// ══ STATE ══
-let currentFile = null;
-let currentBase64 = null;
-let currentMime = 'image/jpeg';
+const firebaseConfig = {
+  apiKey:            "COLE_AQUI",
+  authDomain:        "COLE_AQUI",
+  projectId:         "COLE_AQUI",
+  storageBucket:     "COLE_AQUI",
+  messagingSenderId: "COLE_AQUI",
+  appId:             "COLE_AQUI"
+};
+// ══════════════════════════════════════════
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+// ── STATE ──
+let currentFile     = null;
+let currentBase64   = null;
+let currentMime     = 'image/jpeg';
 let currentProducts = [];
-let nextId = 0;
+let nextId          = 0;
+let allReceipts     = [];
+let appSettings     = { him: 'Eu', her: 'Ela', password: '15112018', geminiKey: '' };
 
-// ══ MONEY HELPERS (sem arredondamento!) ══
-function cents(v) { return Math.round((parseFloat(v) || 0) * 100); }
-function fromCents(c) { return c / 100; }
-function fmt(v) { return 'R$ ' + fromCents(cents(v)).toFixed(2).replace('.', ','); }
+// ── MONEY (sem ponto flutuante) ──
+function cents(v)   { return Math.round((parseFloat(v) || 0) * 100); }
+function fromCents(c){ return c / 100; }
+function fmt(v)     { return 'R$ ' + fromCents(cents(v)).toFixed(2).replace('.', ','); }
 
-// ══ INIT APP ══
-function initApp() {
-  const key = localStorage.getItem('gemini_key') || '';
-  document.getElementById('api-key-input').value = key;
-  document.getElementById('api-key-settings').value = key;
-  document.getElementById('name-him').value = localStorage.getItem('name_him') || 'Eu';
-  document.getElementById('name-her').value = localStorage.getItem('name_her') || 'Ela';
-  document.getElementById('meta-date').value = today();
+// ── SYNC DOT ──
+function setSyncStatus(s) {
+  const d = document.getElementById('sync-dot');
+  if (d) d.className = 'sync-dot ' + s;
+}
+
+// ── FIREBASE: configurações ──
+async function loadSettings() {
+  try {
+    const snap = await getDoc(doc(db, 'config', 'settings'));
+    if (snap.exists()) appSettings = { ...appSettings, ...snap.data() };
+  } catch(e) { console.error('loadSettings:', e); }
+}
+
+async function saveSettingsToCloud() {
+  setSyncStatus('syncing');
+  try {
+    await setDoc(doc(db, 'config', 'settings'), appSettings);
+    setSyncStatus('ok');
+  } catch(e) { setSyncStatus('err'); console.error(e); }
+}
+
+// ── FIREBASE: cupons ──
+async function loadReceipts() {
+  setSyncStatus('syncing');
+  try {
+    const q    = query(collection(db, 'receipts'), orderBy('date', 'desc'));
+    const snap = await getDocs(q);
+    allReceipts = snap.docs.map(d => ({ ...d.data(), _fireId: d.id }));
+    setSyncStatus('ok');
+  } catch(e) {
+    // fallback sem orderBy (antes de criar o índice)
+    try {
+      const snap2 = await getDocs(collection(db, 'receipts'));
+      allReceipts = snap2.docs.map(d => ({ ...d.data(), _fireId: d.id }));
+      allReceipts.sort((a,b) => b.date.localeCompare(a.date));
+      setSyncStatus('ok');
+    } catch(e2) { setSyncStatus('err'); console.error(e2); }
+  }
+  populateMonthSelects();
+  renderHistory();
+}
+
+async function addReceiptToCloud(receipt) {
+  setSyncStatus('syncing');
+  try {
+    const ref = await addDoc(collection(db, 'receipts'), receipt);
+    receipt._fireId = ref.id;
+    allReceipts.unshift(receipt);
+    allReceipts.sort((a,b) => b.date.localeCompare(a.date));
+    setSyncStatus('ok');
+    return true;
+  } catch(e) {
+    setSyncStatus('err');
+    showToast('❌ Erro ao salvar na nuvem!');
+    return false;
+  }
+}
+
+async function deleteReceiptFromCloud(fireId) {
+  setSyncStatus('syncing');
+  try {
+    await deleteDoc(doc(db, 'receipts', fireId));
+    allReceipts = allReceipts.filter(r => r._fireId !== fireId);
+    setSyncStatus('ok');
+    return true;
+  } catch(e) {
+    setSyncStatus('err');
+    showToast('❌ Erro ao apagar!');
+    return false;
+  }
+}
+
+// ── LOGIN ──
+function verificarSenha() {
+  const input = document.getElementById('senha-input').value;
+  if (input === appSettings.password) {
+    document.getElementById('login-erro').style.display = 'none';
+    sessionStorage.setItem('casal_auth', 'ok');
+    liberarAcesso();
+  } else {
+    document.getElementById('login-erro').style.display = 'block';
+  }
+}
+window.verificarSenha = verificarSenha;
+
+function liberarAcesso() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-content').style.display  = 'block';
+  initApp();
+}
+
+function logout() {
+  sessionStorage.removeItem('casal_auth');
+  location.reload();
+}
+window.logout = logout;
+
+// ── BOOT ──
+async function boot() {
+  await loadSettings();
+  document.getElementById('senha-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') verificarSenha();
+  });
+  if (sessionStorage.getItem('casal_auth') === 'ok') liberarAcesso();
+}
+
+// ── INIT APP ──
+async function initApp() {
+  document.getElementById('api-key-input').value    = appSettings.geminiKey || '';
+  document.getElementById('api-key-settings').value = appSettings.geminiKey || '';
+  document.getElementById('name-him').value          = appSettings.him;
+  document.getElementById('name-her').value          = appSettings.her;
+  document.getElementById('meta-date').value         = today();
 
   const zone = document.getElementById('upload-zone');
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
   zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
   zone.addEventListener('drop', e => {
-    e.preventDefault(); zone.classList.remove('dragover');
+    e.preventDefault();
+    zone.classList.remove('dragover');
     if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
   });
 
-  populateMonthSelects();
-  renderHistory();
+  await loadReceipts();
 }
 
 function today() { return new Date().toISOString().split('T')[0]; }
 
-// ══ SETTINGS ══
+// ── SETTINGS ──
 function saveApiKey() {
   const k = document.getElementById('api-key-input').value.trim();
-  localStorage.setItem('gemini_key', k);
+  appSettings.geminiKey = k;
   document.getElementById('api-key-settings').value = k;
+  saveSettingsToCloud();
 }
+window.saveApiKey = saveApiKey;
+
 function saveApiKeySettings() {
   const k = document.getElementById('api-key-settings').value.trim();
-  localStorage.setItem('gemini_key', k);
+  appSettings.geminiKey = k;
   document.getElementById('api-key-input').value = k;
+  saveSettingsToCloud();
 }
+window.saveApiKeySettings = saveApiKeySettings;
+
 function saveNames() {
-  localStorage.setItem('name_him', document.getElementById('name-him').value || 'Eu');
-  localStorage.setItem('name_her', document.getElementById('name-her').value || 'Ela');
+  appSettings.him = document.getElementById('name-him').value || 'Eu';
+  appSettings.her = document.getElementById('name-her').value || 'Ela';
+  saveSettingsToCloud();
 }
+window.saveNames = saveNames;
+
+function changePassword() {
+  const np = document.getElementById('new-password').value.trim();
+  if (!np) { showToast('⚠️ Digite a nova senha!'); return; }
+  appSettings.password = np;
+  saveSettingsToCloud();
+  document.getElementById('new-password').value = '';
+  showToast('✅ Senha alterada!');
+}
+window.changePassword = changePassword;
+
 function getNames() {
-  return {
-    him: localStorage.getItem('name_him') || 'Eu',
-    her: localStorage.getItem('name_her') || 'Ela'
-  };
-}
-function clearAllData() {
-  if (!confirm('Apagar TODOS os cupons salvos? Isso não pode ser desfeito.')) return;
-  localStorage.removeItem('receipts');
-  populateMonthSelects();
-  renderHistory();
-  renderReport();
-  showToast('🗑️ Dados apagados.');
+  return { him: appSettings.him || 'Eu', her: appSettings.her || 'Ela' };
 }
 
-// ══ NAV ══
+async function clearAllData() {
+  if (!confirm('Apagar TODOS os cupons? Não pode desfazer.')) return;
+  setSyncStatus('syncing');
+  try {
+    const snap = await getDocs(collection(db, 'receipts'));
+    await Promise.all(snap.docs.map(d => deleteDoc(doc(db, 'receipts', d.id))));
+    allReceipts = [];
+    setSyncStatus('ok');
+    populateMonthSelects();
+    renderHistory();
+    renderReport();
+    showToast('🗑️ Dados apagados.');
+  } catch(e) { setSyncStatus('err'); showToast('❌ Erro ao apagar.'); }
+}
+window.clearAllData = clearAllData;
+
+// ── NAV ──
 function showPage(id, desktopBtn, navId) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
 
-  // desktop
   document.querySelectorAll('.desktop-nav-btn').forEach(b => b.classList.remove('active'));
   if (desktopBtn) desktopBtn.classList.add('active');
 
-  // mobile
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   if (navId) document.getElementById(navId)?.classList.add('active');
 
   if (id === 'history') { populateMonthSelects(); renderHistory(); }
-  if (id === 'report') { populateMonthSelects(); renderReport(); }
+  if (id === 'report')  { populateMonthSelects(); renderReport(); }
 }
+window.showPage = showPage;
 
-// ══ FILE ══
+// ── FILE ──
 function handleFile(e) { if (e.target.files[0]) loadFile(e.target.files[0]); }
+window.handleFile = handleFile;
 
 function loadFile(file) {
   currentFile = file;
@@ -1035,9 +1227,9 @@ function loadFile(file) {
   const reader = new FileReader();
   reader.onload = e => {
     currentBase64 = e.target.result.split(',')[1];
-    document.getElementById('preview-img').src = e.target.result;
-    document.getElementById('preview-section').style.display = 'block';
-    document.getElementById('upload-zone').style.display = 'none';
+    document.getElementById('preview-img').src              = e.target.result;
+    document.getElementById('preview-section').style.display  = 'block';
+    document.getElementById('upload-zone').style.display      = 'none';
     document.getElementById('products-section').style.display = 'none';
   };
   reader.readAsDataURL(file);
@@ -1045,25 +1237,27 @@ function loadFile(file) {
 
 function resetUpload() {
   currentFile = null; currentBase64 = null; currentProducts = []; nextId = 0;
-  document.getElementById('preview-section').style.display = 'none';
+  document.getElementById('preview-section').style.display  = 'none';
   document.getElementById('products-section').style.display = 'none';
-  document.getElementById('upload-zone').style.display = 'block';
+  document.getElementById('upload-zone').style.display      = 'block';
   document.getElementById('upload-zone').querySelector('input').value = '';
 }
+window.resetUpload = resetUpload;
 
 function resetAll() { resetUpload(); showToast('Descartado.'); }
+window.resetAll = resetAll;
 
-// ══ GEMINI ══
+// ── GEMINI ──
 async function extractWithGemini() {
-  const apiKey = localStorage.getItem('gemini_key') || '';
-  if (!apiKey) { showToast('⚠️ Configure a chave Gemini!'); return; }
-  if (!currentBase64) { showToast('⚠️ Selecione uma imagem!'); return; }
+  const apiKey = appSettings.geminiKey || '';
+  if (!apiKey)      { showToast('⚠️ Configure a chave Gemini!'); return; }
+  if (!currentBase64){ showToast('⚠️ Selecione uma imagem!'); return; }
 
   document.getElementById('extract-btn').disabled = true;
   document.getElementById('loading-box').style.display = 'flex';
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const url  = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
     const body = {
       contents: [{ parts: [
         { inline_data: { mime_type: currentMime, data: currentBase64 } },
@@ -1072,12 +1266,7 @@ async function extractWithGemini() {
       generationConfig: { temperature: 0 }
     };
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-
+    const res  = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     const data = await res.json();
     if (data.error) throw new Error(data.error.message);
 
@@ -1094,12 +1283,12 @@ async function extractWithGemini() {
     }));
 
     if (parsed.store) document.getElementById('meta-store').value = parsed.store;
-    if (parsed.date) document.getElementById('meta-date').value = parsed.date;
+    if (parsed.date)  document.getElementById('meta-date').value  = parsed.date;
 
     renderProducts();
     document.getElementById('products-section').style.display = 'block';
     showToast('✅ ' + currentProducts.length + ' produtos extraídos!');
-  } catch (err) {
+  } catch(err) {
     console.error(err);
     showToast('❌ ' + err.message);
   } finally {
@@ -1107,12 +1296,13 @@ async function extractWithGemini() {
     document.getElementById('loading-box').style.display = 'none';
   }
 }
+window.extractWithGemini = extractWithGemini;
 
-// ══ MANUAL ══
+// ── MANUAL ──
 function addManual() {
-  const nameEl = document.getElementById('new-name');
+  const nameEl  = document.getElementById('new-name');
   const priceEl = document.getElementById('new-price');
-  const name = nameEl.value.trim();
+  const name    = nameEl.value.trim();
   if (!name) { showToast('⚠️ Digite o nome do produto!'); return; }
   currentProducts.push({ id: nextId++, name, priceCents: cents(priceEl.value), split: 'both', otherName: '' });
   nameEl.value = ''; priceEl.value = '';
@@ -1120,11 +1310,12 @@ function addManual() {
   renderProducts();
   nameEl.focus();
 }
+window.addManual = addManual;
 
-// ══ PRODUCTS ══
+// ── PRODUCTS ──
 function renderProducts() {
   const names = getNames();
-  const list = document.getElementById('products-list');
+  const list  = document.getElementById('products-list');
   list.innerHTML = '';
 
   currentProducts.forEach(item => {
@@ -1146,9 +1337,9 @@ function renderProducts() {
       </div>
       <div class="product-controls">
         <div class="split-group">
-          <button class="split-btn ${item.split==='him'?'s-him':''}" onclick="setSplit(${item.id},'him')">${names.him.split(' ')[0]}</button>
-          <button class="split-btn ${item.split==='her'?'s-her':''}" onclick="setSplit(${item.id},'her')">${names.her.split(' ')[0]}</button>
-          <button class="split-btn ${item.split==='both'?'s-both':''}" onclick="setSplit(${item.id},'both')">÷2</button>
+          <button class="split-btn ${item.split==='him'  ?'s-him':''}"   onclick="setSplit(${item.id},'him')">${names.him.split(' ')[0]}</button>
+          <button class="split-btn ${item.split==='her'  ?'s-her':''}"   onclick="setSplit(${item.id},'her')">${names.her.split(' ')[0]}</button>
+          <button class="split-btn ${item.split==='both' ?'s-both':''}"  onclick="setSplit(${item.id},'both')">÷2</button>
           <button class="split-btn ${item.split==='other'?'s-other':''}" onclick="setSplit(${item.id},'other')">👤+</button>
         </div>
       </div>
@@ -1164,6 +1355,7 @@ function removeItem(id) {
   currentProducts = currentProducts.filter(p => p.id !== id);
   renderProducts();
 }
+window.removeItem = removeItem;
 
 function setSplit(id, type) {
   const item = currentProducts.find(p => p.id === id);
@@ -1171,23 +1363,24 @@ function setSplit(id, type) {
   if (type !== 'other') item.otherName = '';
   renderProducts();
 }
+window.setSplit = setSplit;
 
 function setOtherName(id, name) {
-  const item = currentProducts.find(p => p.id === id);
-  item.otherName = name;
+  currentProducts.find(p => p.id === id).otherName = name;
   renderSummary();
 }
+window.setOtherName = setOtherName;
 
-// ══ SUMMARY (cents — sem arredondamento) ══
+// ── TOTAIS (centavos — sem arredondamento) ──
 function calcTotals(products) {
   let himC = 0, herC = 0, otherC = 0;
   products.forEach(p => {
     const c = p.priceCents !== undefined ? p.priceCents : cents(p.price || 0);
-    if (p.split === 'him') himC += c;
-    else if (p.split === 'her') herC += c;
+    if      (p.split === 'him')   himC  += c;
+    else if (p.split === 'her')   herC  += c;
     else if (p.split === 'other') otherC += c;
     else {
-      // divide por 2 em centavos: se ímpar, +1 centavo para "him" (ou qualquer convenção)
+      // divide em centavos — sem arredondamento duplo
       himC += Math.floor(c / 2);
       herC += c - Math.floor(c / 2);
     }
@@ -1196,14 +1389,14 @@ function calcTotals(products) {
 }
 
 function renderSummary() {
-  const names = getNames();
+  const names           = getNames();
   const { himC, herC, otherC } = calcTotals(currentProducts);
-  const coupleC = himC + herC;
+  const coupleC         = himC + herC;
 
   const pills = [
-    { label: names.him, value: fmt(fromCents(himC)), color: 'var(--him)' },
-    { label: names.her, value: fmt(fromCents(herC)), color: 'var(--her)' },
-    { label: 'Casal', value: fmt(fromCents(coupleC)), color: 'var(--both)' },
+    { label: names.him,  value: fmt(fromCents(himC)),    color: 'var(--him)' },
+    { label: names.her,  value: fmt(fromCents(herC)),    color: 'var(--her)' },
+    { label: 'Casal',    value: fmt(fromCents(coupleC)), color: 'var(--both)' },
     otherC > 0 ? { label: 'Terceiros', value: fmt(fromCents(otherC)), color: 'var(--other)' } : null
   ].filter(Boolean);
 
@@ -1215,49 +1408,50 @@ function renderSummary() {
   `).join('');
 }
 
-// ══ SAVE ══
-function saveReceipt() {
+// ── SAVE ──
+async function saveReceipt() {
   if (currentProducts.length === 0) { showToast('⚠️ Nenhum produto!'); return; }
+
   const names = getNames();
   const { himC, herC, otherC } = calcTotals(currentProducts);
 
   const receipt = {
-    id: Date.now(),
-    store: document.getElementById('meta-store').value.trim() || 'Sem nome',
-    date: document.getElementById('meta-date').value || today(),
-    items: currentProducts.map(p => ({...p})),
-    himCents: himC,
-    herCents: herC,
-    otherCents: otherC,
+    id:          Date.now(),
+    store:       document.getElementById('meta-store').value.trim() || 'Sem nome',
+    date:        document.getElementById('meta-date').value || today(),
+    items:       currentProducts.map(p => ({...p})),
+    himCents:    himC,
+    herCents:    herC,
+    otherCents:  otherC,
     coupleCents: himC + herC,
-    totalCents: himC + herC + otherC,
+    totalCents:  himC + herC + otherC,
     imageBase64: currentBase64,
-    imageMime: currentMime,
-    names: { him: names.him, her: names.her }
+    imageMime:   currentMime,
+    names:       { him: names.him, her: names.her },
+    createdAt:   Date.now()
   };
 
-  const all = getReceipts();
-  all.push(receipt);
-  localStorage.setItem('receipts', JSON.stringify(all));
-  showToast('✅ Cupom salvo!');
-  resetAll();
-  populateMonthSelects();
+  const ok = await addReceiptToCloud(receipt);
+  if (ok) {
+    showToast('✅ Cupom salvo na nuvem!');
+    resetAll();
+    populateMonthSelects();
+    renderHistory();
+  }
 }
+window.saveReceipt = saveReceipt;
 
-// ══ DATA ══
-function getReceipts() {
-  try { return JSON.parse(localStorage.getItem('receipts') || '[]'); } catch { return []; }
-}
-
-function deleteReceipt(id) {
+// ── DELETE ──
+async function deleteReceipt(fireId) {
   if (!confirm('Deletar este cupom?')) return;
-  localStorage.setItem('receipts', JSON.stringify(getReceipts().filter(r => r.id !== id)));
-  populateMonthSelects(); renderHistory(); renderReport();
-  showToast('🗑️ Removido.');
+  const ok = await deleteReceiptFromCloud(fireId);
+  if (ok) { populateMonthSelects(); renderHistory(); renderReport(); showToast('🗑️ Removido.'); }
 }
+window.deleteReceipt = deleteReceipt;
 
+// ── MONTH SELECTS ──
 function populateMonthSelects() {
-  const months = [...new Set(getReceipts().map(r => r.date.slice(0,7)))].sort().reverse();
+  const months = [...new Set(allReceipts.map(r => r.date.slice(0,7)))].sort().reverse();
   ['filter-month','report-month'].forEach(sid => {
     const sel = document.getElementById(sid);
     if (!sel) return;
@@ -1266,20 +1460,21 @@ function populateMonthSelects() {
     sel.appendChild(first);
     months.forEach(m => {
       const [y, mo] = m.split('-');
-      const label = new Date(y, mo-1).toLocaleDateString('pt-BR', { month:'long', year:'numeric' });
-      const opt = document.createElement('option');
-      opt.value = m; opt.textContent = label.charAt(0).toUpperCase() + label.slice(1);
+      const label   = new Date(y, mo-1).toLocaleDateString('pt-BR', { month:'long', year:'numeric' });
+      const opt     = document.createElement('option');
+      opt.value = m;
+      opt.textContent = label.charAt(0).toUpperCase() + label.slice(1);
       sel.appendChild(opt);
     });
   });
 }
 
-// ══ HISTORY ══
+// ── HISTORY ──
 function renderHistory() {
-  const month = document.getElementById('filter-month')?.value || '';
+  const month  = document.getElementById('filter-month')?.value  || '';
   const person = document.getElementById('filter-person')?.value || '';
-  let list = getReceipts();
-  if (month) list = list.filter(r => r.date.startsWith(month));
+  let list = [...allReceipts];
+  if (month)          list = list.filter(r => r.date.startsWith(month));
   if (person === 'him') list = list.filter(r => r.himCents > 0);
   if (person === 'her') list = list.filter(r => r.herCents > 0);
   list.sort((a,b) => b.date.localeCompare(a.date));
@@ -1291,18 +1486,22 @@ function renderHistory() {
   }
 
   container.innerHTML = list.map(r => {
-    const names = r.names || getNames();
+    const names   = r.names || getNames();
     const dateStr = new Date(r.date+'T12:00:00').toLocaleDateString('pt-BR', {day:'2-digit',month:'short',year:'numeric'});
 
-    // compatibilidade com registros antigos (que tinham himTotal em vez de himCents)
-    const himC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0);
-    const herC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
+    // compatibilidade com registros antigos
+    const himC   = r.himCents   !== undefined ? r.himCents   : cents(r.himTotal   || 0);
+    const herC   = r.herCents   !== undefined ? r.herCents   : cents(r.herTotal   || 0);
     const otherC = r.otherCents !== undefined ? r.otherCents : cents(r.otherTotal || 0);
 
     const itemRows = r.items.map(item => {
-      const iC = item.priceCents !== undefined ? item.priceCents : cents(item.price || 0);
-      const badgeClass = item.split==='him'?'badge-him':item.split==='her'?'badge-her':item.split==='other'?'badge-other':'badge-both';
-      const badgeLabel = item.split==='him'?names.him.split(' ')[0]:item.split==='her'?names.her.split(' ')[0]:item.split==='other'?(item.otherName||'?'):'÷2';
+      const iC         = item.priceCents !== undefined ? item.priceCents : cents(item.price || 0);
+      const badgeClass = item.split==='him'   ? 'badge-him'  :
+                         item.split==='her'   ? 'badge-her'  :
+                         item.split==='other' ? 'badge-other': 'badge-both';
+      const badgeLabel = item.split==='him'   ? names.him.split(' ')[0] :
+                         item.split==='her'   ? names.her.split(' ')[0] :
+                         item.split==='other' ? (item.otherName || '?') : '÷2';
       return `<div class="receipt-item-row">
         <span style="flex:1">${item.name}</span>
         <span class="item-badge ${badgeClass}">${badgeLabel}</span>
@@ -1311,9 +1510,10 @@ function renderHistory() {
     }).join('');
 
     const imgSrc = r.imageBase64 ? `data:${r.imageMime||'image/jpeg'};base64,${r.imageBase64}` : '';
+    const fid    = r._fireId;
 
     return `<div class="receipt-card">
-      <div class="receipt-head" onclick="toggleCard(${r.id})">
+      <div class="receipt-head" onclick="toggleCard('${fid}')">
         <div>
           <div class="receipt-store">${r.store}</div>
           <div class="receipt-date">${dateStr}</div>
@@ -1327,31 +1527,34 @@ function renderHistory() {
             <div class="amount-dot" style="background:var(--her)"></div>
             <span style="color:var(--her)">${fmt(fromCents(herC))}</span>
           </div>
-          ${otherC > 0 ? `<div class="receipt-amount-item">
+          ${otherC > 0 ? `
+          <div class="receipt-amount-item">
             <div class="amount-dot" style="background:var(--other)"></div>
             <span style="color:var(--other)">${fmt(fromCents(otherC))}</span>
           </div>` : ''}
         </div>
       </div>
-      <div class="receipt-body" id="card-body-${r.id}">
+      <div class="receipt-body" id="card-body-${fid}">
         ${imgSrc ? `<div class="receipt-img-wrap"><img src="${imgSrc}" alt="Cupom"></div>` : ''}
         <div class="receipt-items">${itemRows}</div>
         <div class="receipt-actions">
-          <button class="btn btn-danger btn-sm" onclick="deleteReceipt(${r.id})">🗑️ Apagar</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteReceipt('${fid}')">🗑️ Apagar</button>
         </div>
       </div>
     </div>`;
   }).join('');
 }
+window.renderHistory = renderHistory;
 
 function toggleCard(id) {
-  document.getElementById('card-body-'+id).classList.toggle('open');
+  document.getElementById('card-body-' + id)?.classList.toggle('open');
 }
+window.toggleCard = toggleCard;
 
-// ══ REPORT ══
+// ── REPORT ──
 function renderReport() {
   const month = document.getElementById('report-month')?.value || '';
-  let list = getReceipts();
+  let list    = [...allReceipts];
   if (month) list = list.filter(r => r.date.startsWith(month));
 
   const container = document.getElementById('report-content');
@@ -1365,22 +1568,24 @@ function renderReport() {
   const storeMap = {};
 
   list.forEach(r => {
-    const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal||0);
-    const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal||0);
-    const rOtherC = r.otherCents !== undefined ? r.otherCents : cents(r.otherTotal||0);
-    himC += rHimC; herC += rHerC; otherC += rOtherC;
-    if (!storeMap[r.store]) storeMap[r.store] = { himC:0, herC:0 };
+    const rHimC   = r.himCents   !== undefined ? r.himCents   : cents(r.himTotal   || 0);
+    const rHerC   = r.herCents   !== undefined ? r.herCents   : cents(r.herTotal   || 0);
+    const rOtherC = r.otherCents !== undefined ? r.otherCents : cents(r.otherTotal || 0);
+    himC   += rHimC;
+    herC   += rHerC;
+    otherC += rOtherC;
+    if (!storeMap[r.store]) storeMap[r.store] = { himC: 0, herC: 0 };
     storeMap[r.store].himC += rHimC;
     storeMap[r.store].herC += rHerC;
   });
 
   const coupleC = himC + herC;
-  const grandC = coupleC + otherC;
-  const himPct = coupleC > 0 ? Math.round(himC/coupleC*100) : 0;
-  const herPct = 100 - himPct;
+  const grandC  = coupleC + otherC;
+  const himPct  = coupleC > 0 ? Math.round(himC / coupleC * 100) : 0;
+  const herPct  = 100 - himPct;
 
   const storeRows = Object.entries(storeMap)
-    .sort((a,b) => (b[1].himC+b[1].herC)-(a[1].himC+a[1].herC))
+    .sort((a,b) => (b[1].himC + b[1].herC) - (a[1].himC + a[1].herC))
     .map(([store, v]) => `<div class="store-row">
       <span class="store-name">${store}</span>
       <div class="store-amounts">
@@ -1389,18 +1594,20 @@ function renderReport() {
       </div>
     </div>`).join('');
 
-  const receiptRows = list.sort((a,b)=>b.date.localeCompare(a.date)).map(r => {
-    const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal||0);
-    const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal||0);
-    const d = new Date(r.date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
-    return `<div class="store-row">
-      <span>${d} — ${r.store}</span>
-      <div class="store-amounts">
-        <span style="color:var(--him)">${fmt(fromCents(rHimC))}</span>
-        <span style="color:var(--her)">${fmt(fromCents(rHerC))}</span>
-      </div>
-    </div>`;
-  }).join('');
+  const receiptRows = list
+    .sort((a,b) => b.date.localeCompare(a.date))
+    .map(r => {
+      const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0);
+      const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
+      const d = new Date(r.date+'T12:00:00').toLocaleDateString('pt-BR', {day:'2-digit', month:'short'});
+      return `<div class="store-row">
+        <span>${d} — ${r.store}</span>
+        <div class="store-amounts">
+          <span style="color:var(--him)">${fmt(fromCents(rHimC))}</span>
+          <span style="color:var(--her)">${fmt(fromCents(rHerC))}</span>
+        </div>
+      </div>`;
+    }).join('');
 
   container.innerHTML = `
     <div class="stat-grid">
@@ -1416,10 +1623,12 @@ function renderReport() {
         <div class="stat-label">Total Casal</div>
         <div class="stat-value" style="color:var(--both)">${fmt(fromCents(coupleC))}</div>
       </div>
-      ${otherC > 0 ? `<div class="stat-card">
+      ${otherC > 0 ? `
+      <div class="stat-card">
         <div class="stat-label">Terceiros</div>
         <div class="stat-value" style="color:var(--other)">${fmt(fromCents(otherC))}</div>
-      </div>` : `<div class="stat-card">
+      </div>` : `
+      <div class="stat-card">
         <div class="stat-label">Total Geral</div>
         <div class="stat-value">${fmt(fromCents(grandC))}</div>
       </div>`}
@@ -1429,12 +1638,22 @@ function renderReport() {
       <div class="card-header">📊 Proporção do casal</div>
       <div style="padding:1rem 1.25rem" class="bar-section">
         <div class="bar-row">
-          <div class="bar-label-row"><span>${names.him}</span><span style="color:var(--him)">${himPct}%</span></div>
-          <div class="bar-track"><div class="bar-fill" style="width:${himPct}%;background:var(--him)"></div></div>
+          <div class="bar-label-row">
+            <span>${names.him}</span>
+            <span style="color:var(--him)">${himPct}%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${himPct}%;background:var(--him)"></div>
+          </div>
         </div>
         <div class="bar-row">
-          <div class="bar-label-row"><span>${names.her}</span><span style="color:var(--her)">${herPct}%</span></div>
-          <div class="bar-track"><div class="bar-fill" style="width:${herPct}%;background:var(--her)"></div></div>
+          <div class="bar-label-row">
+            <span>${names.her}</span>
+            <span style="color:var(--her)">${herPct}%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${herPct}%;background:var(--her)"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -1450,14 +1669,19 @@ function renderReport() {
     </div>
   `;
 }
+window.renderReport = renderReport;
 
-// ══ TOAST ══
+// ── TOAST ──
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3000);
 }
+window.showToast = showToast;
+
+// ── INICIAR ──
+boot();
 </script>
 </body>
 </html>
