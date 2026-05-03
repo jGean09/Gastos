@@ -247,6 +247,21 @@ window.closeEditModal = function() {
   editingItems = [];
 };
 
+// Funções globais para manipular os dados do modal sem problemas de escopo
+window.updateEditItem = function(idx, field, value) {
+  if (!editingItems[idx]) return;
+  if (field === 'priceCents') {
+    editingItems[idx].priceCents = Math.round(parseFloat(value || 0) * 100);
+  } else {
+    editingItems[idx][field] = value;
+  }
+};
+
+window.removeEditItem = function(idx) {
+  editingItems.splice(idx, 1);
+  renderEditItems();
+};
+
 function renderEditItems() {
   const names = getNames();
   const container = document.getElementById('edit-items-list');
@@ -262,10 +277,10 @@ function renderEditItems() {
       ].map(o => `<option value="${o.v}" ${item.split === o.v ? 'selected' : ''}>${o.l}</option>`).join('');
 
       return `<div class="edit-item-row">
-        <input class="edit-item-name" value="${item.name}" oninput="editingItems[${idx}].name=this.value" placeholder="Nome">
-        <input class="edit-item-price" type="number" step="0.01" value="${fromCents(item.priceCents || 0).toFixed(2)}" oninput="editingItems[${idx}].priceCents=Math.round(this.value*100)">
-        <select class="field-input" style="width:70px;padding:0.4rem 0.3rem;font-size:0.75rem" onchange="editingItems[${idx}].split=this.value">${splitOpts}</select>
-        <button class="del-item-btn" onclick="editingItems.splice(${idx},1);renderEditItems()">✕</button>
+        <input class="edit-item-name" value="${item.name}" oninput="window.updateEditItem(${idx}, 'name', this.value)" placeholder="Nome">
+        <input class="edit-item-price" type="number" step="0.01" value="${fromCents(item.priceCents || 0).toFixed(2)}" oninput="window.updateEditItem(${idx}, 'priceCents', this.value)">
+        <select class="field-input" style="width:70px;padding:0.4rem 0.3rem;font-size:0.75rem" onchange="window.updateEditItem(${idx}, 'split', this.value)">${splitOpts}</select>
+        <button class="del-item-btn" onclick="window.removeEditItem(${idx})">✕</button>
       </div>`;
     }).join('');
 }
@@ -677,10 +692,10 @@ window.saveReceipt = async function() {
     };
     const ok = await addReceiptToCloud(receipt);
     if (ok) {
-      window.showToast('✅ Cupom salvo na nuvem!');
-      window.resetAll();
+      window.resetUpload(); 
       window.populateMonthSelects();
       window.renderHistory();
+      window.showToast('✅ Cupom salvo na nuvem!');
     }
   } catch (error) {
     window.showToast("Erro ao salvar: " + error.message);
@@ -845,7 +860,6 @@ window.toggleCard = function(id) {
 
 // ── DONUT CHART SVG ──
 function buildDonutSVG(segments) {
-  // segments: [{value, color, label}]
   const total = segments.reduce((s, seg) => s + seg.value, 0);
   if (total === 0) return '';
   const r = 52, cx = 60, cy = 60, stroke = 16;
