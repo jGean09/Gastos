@@ -30,6 +30,9 @@ let nextId = 0;
 let allReceipts = [];
 let appSettings = { him: 'Eu', her: 'Ela', password: '15112018', geminiKey: '', monthlyGoal: 0 };
 
+// Travas de Prevenção (Evita salvar 2x)
+let isSaving = false;
+
 // Estado do modal de edição
 let editingFireId = null;
 let editingItems = [];
@@ -255,6 +258,12 @@ window.updateEditItem = function(idx, field, value) {
   } else {
     editingItems[idx][field] = value;
   }
+  
+  // Se o usuário selecionou ou tirou a opção "Terceiros", re-renderiza o modal para mostrar/esconder o input do nome
+  if (field === 'split') {
+    if (value !== 'other') editingItems[idx].otherName = '';
+    renderEditItems();
+  }
 };
 
 window.removeEditItem = function(idx) {
@@ -276,19 +285,31 @@ function renderEditItems() {
         { v: 'other', l: '👤' }
       ].map(o => `<option value="${o.v}" ${item.split === o.v ? 'selected' : ''}>${o.l}</option>`).join('');
 
-      return `<div class="edit-item-row">
-        <input class="edit-item-name" value="${item.name}" oninput="window.updateEditItem(${idx}, 'name', this.value)" placeholder="Nome">
-        <input class="edit-item-price" type="number" step="0.01" value="${fromCents(item.priceCents || 0).toFixed(2)}" oninput="window.updateEditItem(${idx}, 'priceCents', this.value)">
-        <select class="field-input" style="width:70px;padding:0.4rem 0.3rem;font-size:0.75rem" onchange="window.updateEditItem(${idx}, 'split', this.value)">${splitOpts}</select>
-        <button class="del-item-btn" onclick="window.removeEditItem(${idx})">✕</button>
+      // Input dinâmico que aparece se estiver emprestado
+      const otherInput = item.split === 'other'
+        ? `<input class="other-input" style="margin-top:0.4rem" placeholder="Nome de quem pegou emprestado..." value="${item.otherName || ''}" oninput="window.updateEditItem(${idx}, 'otherName', this.value)">`
+        : '';
+
+      return `<div style="margin-bottom:0.75rem; border-bottom:1px solid var(--border); padding-bottom:0.75rem;">
+        <div class="edit-item-row" style="border-bottom:none; padding:0;">
+          <input class="edit-item-name" value="${item.name}" oninput="window.updateEditItem(${idx}, 'name', this.value)" placeholder="Nome">
+          <input class="edit-item-price" type="number" step="0.01" value="${fromCents(item.priceCents || 0).toFixed(2)}" oninput="window.updateEditItem(${idx}, 'priceCents', this.value)">
+          <select class="field-input" style="width:70px;padding:0.4rem 0.3rem;font-size:0.75rem" onchange="window.updateEditItem(${idx}, 'split', this.value)">${splitOpts}</select>
+          <button class="del-item-btn" onclick="window.removeEditItem(${idx})">✕</button>
+        </div>
+        ${otherInput}
       </div>`;
     }).join('');
 }
 
 window.saveEditModal = async function() {
   try {
+    if (isSaving) return; // Trava contra duplo clique
+    
     const receipt = allReceipts.find(r => r._fireId === editingFireId);
     if (!receipt) return;
+
+    isSaving = true;
 
     const { himC, herC, otherC } = calcTotals(editingItems);
     const names = getNames();
@@ -316,6 +337,8 @@ window.saveEditModal = async function() {
   } catch(e) {
     setSyncStatus('err');
     window.showToast('❌ Erro ao salvar: ' + e.message);
+  } finally {
+    isSaving = false;
   }
 };
 
@@ -367,6 +390,8 @@ async function initApp() {
 // ── LANÇAMENTO RÁPIDO ──
 window.saveQuickExpense = async function() {
   try {
+    if (isSaving) return; // Trava contra clique duplo
+
     const desc = document.getElementById('quick-desc').value.trim();
     const price = document.getElementById('quick-price').value;
     const payer = document.getElementById('quick-payer').value;
@@ -377,6 +402,8 @@ window.saveQuickExpense = async function() {
     if (!desc) { window.showToast('⚠️ Digite o que é o gasto!'); return; }
     if (!price || price <= 0) { window.showToast('⚠️ Digite o valor!'); return; }
     if (split === 'other' && !otherName) { window.showToast('⚠️ Digite o nome do devedor!'); return; }
+
+    isSaving = true;
 
     const itemCents = cents(price);
     let himC = 0, herC = 0, otherC = 0;
@@ -408,6 +435,8 @@ window.saveQuickExpense = async function() {
     }
   } catch (error) {
     window.showToast("Erro: " + error.message);
+  } finally {
+    isSaving = false;
   }
 };
 
@@ -674,7 +703,11 @@ window.renderSummary = function() {
 // ── SALVAR CUPOM ──
 window.saveReceipt = async function() {
   try {
+    if (isSaving) return; // Trava do clique duplo
     if (currentProducts.length === 0) { window.showToast('⚠️ Nenhum produto adicionado!'); return; }
+    
+    isSaving = true;
+    
     const names = getNames();
     const { himC, herC, otherC } = calcTotals(currentProducts);
     const receipt = {
@@ -690,6 +723,7 @@ window.saveReceipt = async function() {
       imageBase64: currentBase64, imageMime: currentMime,
       names: { him: names.him, her: names.her }, createdAt: Date.now()
     };
+    
     const ok = await addReceiptToCloud(receipt);
     if (ok) {
       window.resetUpload(); 
@@ -699,6 +733,8 @@ window.saveReceipt = async function() {
     }
   } catch (error) {
     window.showToast("Erro ao salvar: " + error.message);
+  } finally {
+    isSaving = false;
   }
 };
 
