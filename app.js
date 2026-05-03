@@ -521,24 +521,55 @@ window.showPage = function(id, desktopBtn, navId) {
   }
 };
 
-// ── UPLOAD / CUPOM ──
+// ── UPLOAD / CUPOM COM COMPRESSÃO AUTOMÁTICA ──
 window.handleFile = function(e) { if (e.target.files[0]) window.loadFile(e.target.files[0]); };
 
 window.loadFile = function(file) {
   try {
     currentFile = file;
-    currentMime = file.type || 'image/jpeg';
+    currentMime = 'image/jpeg'; // Força JPEG para compressão
     const reader = new FileReader();
     reader.onload = e => {
-      currentBase64 = e.target.result.split(',')[1];
-      document.getElementById('preview-img').src = e.target.result;
-      document.getElementById('preview-section').style.display = 'block';
-      document.getElementById('upload-zone').style.display = 'none';
-      document.getElementById('products-section').style.display = 'none';
+      const img = new Image();
+      img.onload = () => {
+        // Redimensionamento e compressão
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200; 
+        const MAX_HEIGHT = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height = Math.round(height * MAX_WIDTH / width);
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width = Math.round(width * MAX_HEIGHT / height);
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Comprime para 60% da qualidade original para caber no Firebase
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+
+        currentBase64 = dataUrl.split(',')[1];
+        document.getElementById('preview-img').src = dataUrl;
+        document.getElementById('preview-section').style.display = 'block';
+        document.getElementById('upload-zone').style.display = 'none';
+        document.getElementById('products-section').style.display = 'none';
+      };
+      img.src = e.target.result;
     };
     reader.readAsDataURL(file);
   } catch (error) {
-    window.showToast("Erro ao carregar imagem: " + error.message);
+    window.showToast("Erro ao carregar a imagem: " + error.message);
   }
 };
 
