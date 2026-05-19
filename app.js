@@ -56,12 +56,27 @@ function setSyncStatus(s) {
   } catch(e) {}
 }
 
-// ── ABAS ──
+// ── ABAS E NAVEGAÇÃO ──
 window.switchTab = function(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   document.getElementById('tab-content-' + tab).classList.add('active');
+};
+
+window.showPage = function(id, desktopBtn, navId) {
+  try {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + id).classList.add('active');
+    document.querySelectorAll('.desktop-nav-btn').forEach(b => b.classList.remove('active'));
+    if (desktopBtn) desktopBtn.classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    if (navId) document.getElementById(navId)?.classList.add('active');
+    
+    if (id === 'history') { window.populateMonthSelects(); window.renderHistory(); }
+    if (id === 'report')  { window.populateMonthSelects(); window.renderReport(); }
+    if (id === 'personal') { window.renderPersonalDashboard(); }
+  } catch (error) {}
 };
 
 // ── ATUALIZAR SELECTS DE PAGADOR ──
@@ -154,7 +169,6 @@ async function loadReceipts() {
   try {
     window.populateMonthSelects();
     window.renderHistory();
-    // Se a pessoa abrir o app e já estiver na aba personal
     if (document.getElementById('page-personal').classList.contains('active')) window.renderPersonalDashboard();
   } catch (error) {}
 }
@@ -187,7 +201,6 @@ window.deleteReceipt = async function(fireId) {
     setSyncStatus('ok');
     window.showToast('🗑️ Removido com sucesso.');
     
-    // Atualiza a tela certa dependendo de onde o usuário está
     if (isPersonal) {
       window.renderPersonalDashboard();
     } else {
@@ -241,7 +254,7 @@ window.saveSettlement = async function() {
 
   const receipt = {
     id: Date.now(),
-    type: 'settlement', // Flag especial para reconhecer que é um Pix/Acerto
+    type: 'settlement',
     store: '💸 Acerto de Contas (Pix)',
     date: date,
     payer: payer,
@@ -264,10 +277,9 @@ window.saveSettlement = async function() {
 
 // ── PAINEL PESSOAL ──
 window.renderPersonalDashboard = function() {
-  const owner = document.getElementById('personal-owner').value; // 'him' or 'her'
+  const owner = document.getElementById('personal-owner').value; 
   const scopeName = `personal_${owner}`;
   const names = getNames();
-  const ownerName = owner === 'him' ? names.him : names.her;
   
   let list = allReceipts.filter(r => r.scope === scopeName);
   list.sort((a,b) => b.date.localeCompare(a.date));
@@ -284,7 +296,7 @@ window.renderPersonalDashboard = function() {
   const balanceColor = balanceCents >= 0 ? 'var(--both)' : 'var(--her)';
 
   const historyHTML = list.length === 0 
-    ? `<div class="empty"><p>Nenhum lançamento no seu painel pessoal ainda.</p></div>` 
+    ? `<div class="empty"><p>Nenhum lançamento no seu painel pessoal.</p></div>` 
     : list.map(r => {
         const dStr = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
         const isInc = r.type === 'income';
@@ -306,7 +318,7 @@ window.renderPersonalDashboard = function() {
 
   const html = `
     <div class="card" style="margin-bottom:1.5rem">
-      <div class="card-header">➕ Novo Lançamento (Só pra mim)</div>
+      <div class="card-header">➕ Novo Lançamento Pessoal</div>
       <div style="padding:1.25rem">
         <div class="meta-grid">
           <div>
@@ -351,13 +363,11 @@ window.renderPersonalDashboard = function() {
       </div>
     </div>
   `;
-
   document.getElementById('personal-dashboard-content').innerHTML = html;
 };
 
 window.savePersonalTransaction = async function() {
   if (isSaving) return;
-  
   const owner = document.getElementById('personal-owner').value;
   const type = document.getElementById('pers-type').value;
   const price = document.getElementById('pers-price').value;
@@ -370,14 +380,9 @@ window.savePersonalTransaction = async function() {
   const names = getNames();
 
   const receipt = {
-    id: Date.now(),
-    scope: `personal_${owner}`,
-    type: type, // 'income' ou 'expense'
-    store: desc, // usando o campo de loja para a descrição
-    date: today(),
-    amountCents: amountCents,
-    names: { him: names.him, her: names.her },
-    createdAt: Date.now()
+    id: Date.now(), scope: `personal_${owner}`, type: type,
+    store: desc, date: today(), amountCents: amountCents,
+    names: { him: names.him, her: names.her }, createdAt: Date.now()
   };
 
   const ok = await addReceiptToCloud(receipt);
@@ -584,21 +589,6 @@ window.clearAllData = async function() {
   } catch(e) { setSyncStatus('err'); }
 };
 
-window.showPage = function(id, desktopBtn, navId) {
-  try {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.getElementById('page-' + id).classList.add('active');
-    document.querySelectorAll('.desktop-nav-btn').forEach(b => b.classList.remove('active'));
-    if (desktopBtn) desktopBtn.classList.add('active');
-    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-    if (navId) document.getElementById(navId)?.classList.add('active');
-    
-    if (id === 'history') { window.populateMonthSelects(); window.renderHistory(); }
-    if (id === 'report')  { window.populateMonthSelects(); window.renderReport(); }
-    if (id === 'personal') { window.renderPersonalDashboard(); }
-  } catch (error) {}
-};
-
 // ── LER CUPOM COM GEMINI E COMPRESSÃO ──
 window.handleFile = function(e) { if (e.target.files[0]) window.loadFile(e.target.files[0]); };
 window.loadFile = function(file) {
@@ -740,7 +730,7 @@ function buildDonutSVG(segments) {
 
 window.populateMonthSelects = function() {
   try {
-    const list = allReceipts.filter(r => !r.scope); // Não inclui itens do painel pessoal nos filtros do mês do casal
+    const list = allReceipts.filter(r => !r.scope);
     const months = [...new Set(list.map(r => r.date.slice(0, 7)))].sort().reverse();
     ['filter-month', 'report-month'].forEach(sid => {
       const sel = document.getElementById(sid); if (!sel) return;
@@ -759,9 +749,10 @@ window.renderHistory = function() {
     const person = document.getElementById('filter-person')?.value || '';
     const category = document.getElementById('filter-category')?.value || '';
     
-    // Filtra para mostrar tudo (Gastos + Pix)
-    let list = [...allReceipts].filter(r => !r.scope);
+    // Filtra para mostrar apenas lançamentos do casal
+    let list = allReceipts.filter(r => !r.scope);
     
+    // AGORA o filtro de mês filtra TUDO (Gastos e Acertos/Pix)
     if (month) list = list.filter(r => r.date.startsWith(month));
     if (person === 'him') list = list.filter(r => r.type === 'settlement' ? r.payer === 'him' : r.himCents > 0);
     if (person === 'her') list = list.filter(r => r.type === 'settlement' ? r.payer === 'her' : r.herCents > 0);
@@ -851,27 +842,47 @@ window.renderHistory = function() {
   }
 };
 
+window.toggleCard = function(id) {
+  try { document.getElementById('card-body-' + id)?.classList.toggle('open'); } catch(e) {}
+};
+
 window.renderReport = function() {
   try {
     const month = document.getElementById('report-month')?.value || '';
     
-    // O Acerto de Contas (Dívida Acumulada) não obedece o filtro de mês. Ele é ABSOLUTO e HISTÓRICO.
+    // Pega APENAS as contas do casal, sem o painel pessoal
+    let list = allReceipts.filter(r => !r.scope);
+    
+    // O FILTRO DE MÊS AGORA AFETA TUDO (Inclusive a Dívida Acumulada/Acerto)
+    if (month) list = list.filter(r => r.date.startsWith(month));
+
+    const container = document.getElementById('report-content');
+    const names = getNames();
+
     let runningBalanceCents = 0; 
     let thirdPartyDebts = { him: {}, her: {} };
-    
-    allReceipts.forEach(r => {
-      if (r.scope) return; // Ignora o painel pessoal
-      
+    let himC = 0, herC = 0, otherC = 0;
+    const storeMap = {}; const categoryMap = {};
+
+    list.forEach(r => {
       if (r.type === 'settlement') {
-        // Se foi um Pix: Ele pagou = Dívida dela aumenta (positivo). Ela pagou = Dívida dela cai (negativo)
         if (r.payer === 'him') runningBalanceCents += r.amountCents;
         else if (r.payer === 'her') runningBalanceCents -= r.amountCents;
       } else {
-        // Contas normais (Só soma as que estão "Em Aberto")
+        const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0);
+        const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
+        const rOtherC = r.otherCents !== undefined ? r.otherCents : cents(r.otherTotal || 0);
+        
+        // ESTATÍSTICAS
+        himC += rHimC; herC += rHerC; otherC += rOtherC;
+        if (!storeMap[r.store]) storeMap[r.store] = { himC: 0, herC: 0 };
+        storeMap[r.store].himC += rHimC; storeMap[r.store].herC += rHerC;
+        const cat = r.category || 'outros';
+        if (!categoryMap[cat]) categoryMap[cat] = 0;
+        categoryMap[cat] += rHimC + rHerC + rOtherC;
+
+        // ACERTO DE CONTAS (SÓ CONTA SE ESTIVER EM ABERTO)
         if (r.status !== 'paid') {
-          const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0);
-          const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
-          
           if (r.payer === 'him') {
             runningBalanceCents += rHerC; 
             if (r.items) r.items.filter(i => i.split === 'other').forEach(i => {
@@ -889,60 +900,35 @@ window.renderReport = function() {
       }
     });
 
-    // Agora sim, para os Gráficos de Pizza/Categorias e a Lista, pegamos só o MÊS ATUAL selecionado
-    let list = allReceipts.filter(r => !r.scope && r.type !== 'settlement');
-    if (month) list = list.filter(r => r.date.startsWith(month));
-
-    const container = document.getElementById('report-content');
-    const names = getNames();
-
-    // Lógica do HTML do Acerto Acumulado Global
     let settlementHTML = '';
     if (runningBalanceCents > 0) {
       settlementHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--both)">
-        <div class="card-header" style="color:var(--both)">🤝 Dívida Acumulada</div>
+        <div class="card-header" style="color:var(--both)">🤝 Acerto do Mês Selecionado</div>
         <div style="padding:1.25rem;text-align:center">
           <div style="font-size:0.85rem;color:var(--muted2);margin-bottom:0.4rem">${names.her} deve pagar para ${names.him}</div>
           <div style="font-size:2rem;font-weight:900;color:var(--both);letter-spacing:-1px">${fmt(fromCents(runningBalanceCents))}</div>
-          <div style="font-size:0.7rem;color:var(--muted2);margin-top:0.4rem">*Considera TODO o histórico pendente (descontando os Pix)</div>
         </div></div>`;
     } else if (runningBalanceCents < 0) {
       settlementHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--her)">
-        <div class="card-header" style="color:var(--her)">🤝 Dívida Acumulada</div>
+        <div class="card-header" style="color:var(--her)">🤝 Acerto do Mês Selecionado</div>
         <div style="padding:1.25rem;text-align:center">
           <div style="font-size:0.85rem;color:var(--muted2);margin-bottom:0.4rem">${names.him} deve pagar para ${names.her}</div>
           <div style="font-size:2rem;font-weight:900;color:var(--her);letter-spacing:-1px">${fmt(fromCents(Math.abs(runningBalanceCents)))}</div>
-          <div style="font-size:0.7rem;color:var(--muted2);margin-top:0.4rem">*Considera TODO o histórico pendente (descontando os Pix)</div>
         </div></div>`;
     } else {
       settlementHTML = `<div class="card" style="margin-bottom:1rem">
-        <div class="card-header">🤝 Dívida Acumulada</div>
-        <div style="padding:1.25rem;text-align:center;font-weight:700;color:var(--both)">Tudo quite! Ninguém deve nada no histórico. ✅</div>
+        <div class="card-header">🤝 Acerto do Mês Selecionado</div>
+        <div style="padding:1.25rem;text-align:center;font-weight:700;color:var(--both)">Tudo quite neste mês! ✅</div>
       </div>`;
     }
 
-    if (!list.length) {
-      container.innerHTML = `${settlementHTML}<div class="empty"><div class="empty-icon">📊</div><p>Nenhum gasto registrado ${month ? 'neste mês' : '— selecione um mês'}.</p></div>`;
+    // Retira os settlements (Pix) da lista abaixo, para mostrar apenas os gastos
+    let listGastos = list.filter(r => r.type !== 'settlement');
+
+    if (!listGastos.length && runningBalanceCents === 0) {
+      container.innerHTML = `<div class="empty"><div class="empty-icon">📊</div><p>Nenhum gasto ou acerto registrado ${month ? 'neste mês' : '— selecione um mês'}.</p></div>`;
       return;
     }
-
-    // Variáveis apenas para as ESTATÍSTICAS DO MÊS
-    let himC = 0, herC = 0, otherC = 0;
-    const storeMap = {}; const categoryMap = {};
-
-    list.forEach(r => {
-      const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0);
-      const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
-      const rOtherC = r.otherCents !== undefined ? r.otherCents : cents(r.otherTotal || 0);
-      himC += rHimC; herC += rHerC; otherC += rOtherC;
-
-      if (!storeMap[r.store]) storeMap[r.store] = { himC: 0, herC: 0 };
-      storeMap[r.store].himC += rHimC; storeMap[r.store].herC += rHerC;
-
-      const cat = r.category || 'outros';
-      if (!categoryMap[cat]) categoryMap[cat] = 0;
-      categoryMap[cat] += rHimC + rHerC + rOtherC;
-    });
 
     const coupleC = himC + herC; const grandC = coupleC + otherC;
     const himPct = coupleC > 0 ? Math.round(himC / coupleC * 100) : 0; const herPct = 100 - himPct;
@@ -950,7 +936,7 @@ window.renderReport = function() {
     let thirdPartyHTML = ''; let hasDebts = false; let debtsRows = '';
     Object.entries(thirdPartyDebts.him).forEach(([name, amount]) => { hasDebts = true; debtsRows += `<div class="store-row"><span>${name} <small style="color:var(--muted2)">(deve a ${names.him})</small></span><span style="color:var(--him);font-weight:800">${fmt(fromCents(amount))}</span></div>`; });
     Object.entries(thirdPartyDebts.her).forEach(([name, amount]) => { hasDebts = true; debtsRows += `<div class="store-row"><span>${name} <small style="color:var(--muted2)">(deve a ${names.her})</small></span><span style="color:var(--her);font-weight:800">${fmt(fromCents(amount))}</span></div>`; });
-    if (hasDebts) { thirdPartyHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--other)"><div class="card-header" style="color:var(--other)">👥 A Receber de Terceiros (Em Aberto)</div><div style="padding:0 1.25rem">${debtsRows}</div></div>`; }
+    if (hasDebts) { thirdPartyHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--other)"><div class="card-header" style="color:var(--other)">👥 A Receber de Terceiros (Em Aberto no mês)</div><div style="padding:0 1.25rem">${debtsRows}</div></div>`; }
 
     let goalHTML = '';
     if (appSettings.monthlyGoal > 0) {
@@ -963,7 +949,7 @@ window.renderReport = function() {
       <div class="stat-card"><div class="stat-label">${names.him} consumiu no mês</div><div class="stat-value" style="color:var(--him)">${fmt(fromCents(himC))}</div></div>
       <div class="stat-card"><div class="stat-label">${names.her} consumiu no mês</div><div class="stat-value" style="color:var(--her)">${fmt(fromCents(herC))}</div></div>
       <div class="stat-card"><div class="stat-label">Total do casal (Mês)</div><div class="stat-value" style="color:var(--both)">${fmt(fromCents(coupleC))}</div></div>
-      ${otherC > 0 ? `<div class="stat-card"><div class="stat-label">Terceiros no mês</div><div class="stat-value" style="color:var(--other)">${fmt(fromCents(otherC))}</div></div>` : `<div class="stat-card"><div class="stat-label">Contas no mês</div><div class="stat-value">${list.length}</div></div>`}
+      ${otherC > 0 ? `<div class="stat-card"><div class="stat-label">Terceiros no mês</div><div class="stat-value" style="color:var(--other)">${fmt(fromCents(otherC))}</div></div>` : `<div class="stat-card"><div class="stat-label">Contas no mês</div><div class="stat-value">${listGastos.length}</div></div>`}
     </div>`;
 
     const donutSegs = [ { value: himC, color: 'var(--him)', label: names.him, val: fmt(fromCents(himC)) }, { value: herC, color: 'var(--her)', label: names.her, val: fmt(fromCents(herC)) } ];
@@ -977,7 +963,7 @@ window.renderReport = function() {
     const categoryHTML = grandC > 0 ? `<div class="card" style="margin-bottom:1rem"><div class="card-header">📂 Gastos por categoria (Mês)</div><div style="padding:0.5rem 1.25rem">${catRows}</div></div>` : '';
 
     const storeRows = Object.entries(storeMap).sort((a, b) => (b[1].himC + b[1].herC) - (a[1].himC + a[1].herC)).slice(0, 8).map(([store, v]) => `<div class="store-row"><span class="store-name">${store}</span><div class="store-amounts"><span style="color:var(--him)">${fmt(fromCents(v.himC))}</span><span style="color:var(--her)">${fmt(fromCents(v.herC))}</span></div></div>`).join('');
-    const receiptRows = [...list].sort((a, b) => b.date.localeCompare(a.date)).map(r => {
+    const receiptRows = [...listGastos].sort((a, b) => b.date.localeCompare(a.date)).map(r => {
       const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0); const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
       const d = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
       return `<div class="store-row" style="${r.status === 'paid' ? 'opacity:0.6' : ''}"><span>${d} — ${r.store} <span class="category-badge">${catLabel(r.category || 'outros')}</span></span><div class="store-amounts"><span style="color:var(--him)">${fmt(fromCents(rHimC))}</span><span style="color:var(--her)">${fmt(fromCents(rHerC))}</span></div></div>`;
@@ -993,7 +979,7 @@ window.renderReport = function() {
       ${donutHTML}
       ${categoryHTML}
       <div class="card" style="margin-bottom:1rem"><div class="card-header">🏪 Onde vocês mais gastaram (Mês)</div><div style="padding:0 1.25rem">${storeRows}</div></div>
-      <div class="card" style="margin-bottom:1rem"><div class="card-header">🧾 ${list.length} contas no mês</div><div style="padding:0 1.25rem">${receiptRows}</div></div>
+      <div class="card" style="margin-bottom:1rem"><div class="card-header">🧾 ${listGastos.length} contas no mês</div><div style="padding:0 1.25rem">${receiptRows}</div></div>
       ${exportBtn}
     `;
   } catch (error) {}

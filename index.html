@@ -38,47 +38,121 @@
 
 <div id="app-content" style="display:none">
 
-<header class="header">
-  <div class="logo">
-    <div class="logo-icon">💰</div>
-    Gastos Casal
-  </div>
-  <div style="display:flex;align-items:center;gap:0.75rem">
-    <div class="sync-dot" id="sync-dot" title="Status da sincronização"></div>
-    <nav class="desktop-nav">
-      <button class="desktop-nav-btn active" onclick="window.showPage('add',this)">＋ Gastos</button>
-      <button class="desktop-nav-btn" onclick="window.showPage('history',this)">Histórico</button>
-      <button class="desktop-nav-btn" onclick="window.showPage('report',this)">Relatório</button>
-      <button class="desktop-nav-btn" onclick="window.showPage('personal',this)">Pessoal</button>
-      <button class="desktop-nav-btn" onclick="window.showPage('settings',this)">Config</button>
-    </nav>
-  </div>
-</header>
+  <header class="header">
+    <div class="logo">
+      <div class="logo-icon">💰</div>
+      Gastos Casal
+    </div>
+    <div style="display:flex;align-items:center;gap:0.75rem">
+      <div class="sync-dot" id="sync-dot" title="Status da sincronização"></div>
+      <nav class="desktop-nav">
+        <button class="desktop-nav-btn active" onclick="window.showPage('add',this)">＋ Gastos</button>
+        <button class="desktop-nav-btn" onclick="window.showPage('history',this)">Histórico</button>
+        <button class="desktop-nav-btn" onclick="window.showPage('report',this)">Relatório</button>
+        <button class="desktop-nav-btn" onclick="window.showPage('personal',this)">Pessoal</button>
+        <button class="desktop-nav-btn" onclick="window.showPage('settings',this)">Config</button>
+      </nav>
+    </div>
+  </header>
 
-<div id="page-add" class="page active">
+  <div id="page-add" class="page active">
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tab-quick" onclick="window.switchTab('quick')">💸 Lançamento Rápido</button>
+      <button class="tab-btn" id="tab-cupom" onclick="window.switchTab('cupom')">🧾 Ler Cupom</button>
+    </div>
 
-  <div class="tab-bar">
-    <button class="tab-btn active" id="tab-quick" onclick="window.switchTab('quick')">💸 Lançamento Rápido</button>
-    <button class="tab-btn" id="tab-cupom" onclick="window.switchTab('cupom')">🧾 Ler Cupom</button>
-  </div>
+    <div id="tab-content-quick" class="tab-content active">
+      <div class="card" style="border-color: var(--other);">
+        <div class="card-header" style="color: var(--other);">💸 Lançamento Rápido / Empréstimo</div>
+        <div style="padding: 1.25rem;">
+          <div class="meta-grid">
+            <div style="grid-column: span 2;">
+              <label class="field-label">O que é?</label>
+              <input class="field-input" id="quick-desc" placeholder="Ex: Empréstimo João, Lanche, Uber...">
+            </div>
+            <div>
+              <label class="field-label">Valor</label>
+              <input class="field-input" type="number" step="0.01" min="0" id="quick-price" placeholder="R$ 0,00">
+            </div>
+            <div>
+              <label class="field-label">Categoria</label>
+              <select class="field-input" id="quick-category">
+                <option value="outros">📦 Outros</option>
+                <option value="mercado">🛒 Mercado</option>
+                <option value="restaurante">🍽️ Restaurante</option>
+                <option value="transporte">🚗 Transporte</option>
+                <option value="saude">💊 Saúde</option>
+                <option value="lazer">🎉 Lazer</option>
+                <option value="moradia">🏠 Moradia</option>
+                <option value="educacao">📚 Educação</option>
+                <option value="roupas">👕 Roupas</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label">Quem pagou?</label>
+              <select class="field-input" id="quick-payer"></select>
+            </div>
+            <div>
+              <label class="field-label">Para quem?</label>
+              <select class="field-input" id="quick-split" onchange="document.getElementById('quick-other-div').style.display = this.value === 'other' ? 'block' : 'none'">
+                <option value="both">Dividir entre o Casal</option>
+                <option value="him">Só pra mim</option>
+                <option value="her">Só pra ela</option>
+                <option value="other">Emprestado (Terceiro)</option>
+              </select>
+            </div>
+            <div id="quick-other-div" style="grid-column: span 2; display: none;">
+              <label class="field-label">Nome de quem pegou emprestado</label>
+              <input class="field-input" id="quick-other-name" placeholder="Ex: Marcos, Mãe, etc...">
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%; margin-top:0.5rem; background: var(--other); color: #000;" onclick="window.saveQuickExpense()">💾 Salvar Lançamento</button>
+        </div>
+      </div>
+    </div>
 
-  <div id="tab-content-quick" class="tab-content active">
-    <div class="card" style="border-color: var(--other);">
-      <div class="card-header" style="color: var(--other);">💸 Lançamento Rápido / Empréstimo</div>
-      <div style="padding: 1.25rem;">
+    <div id="tab-content-cupom" class="tab-content">
+      <div class="api-banner" id="api-banner">
+        <div class="api-banner-title">🔑 Chave Google Gemini (gratuita)</div>
+        <div class="api-banner-desc">Acesse <strong>aistudio.google.com</strong> → Get API Key → Create API Key. Grátis, sem cartão.</div>
+        <input class="settings-input" type="password" id="api-key-input" placeholder="AIza..." oninput="window.saveApiKey()">
+      </div>
+
+      <div id="upload-zone" class="upload-zone">
+        <input type="file" accept="image/*" onchange="window.handleFile(event)">
+        <div class="upload-icon">📷</div>
+        <h2>Toque para fotografar o cupom</h2>
+        <p>ou arraste uma imagem aqui</p>
+      </div>
+
+      <div id="preview-section" style="display:none">
+        <img id="preview-img" class="preview-img" alt="Cupom">
+        <div class="btn-row">
+          <button class="btn btn-primary" id="extract-btn" onclick="window.extractWithGemini()">✨ Extrair com IA</button>
+          <button class="btn btn-ghost" onclick="window.resetUpload()">✕ Cancelar</button>
+        </div>
+        <div class="loading-box" id="loading-box" style="display:none;margin-top:0.75rem">
+          <div class="spinner"></div>
+          <div>
+            <strong>Gemini analisando...</strong><br>
+            <small>Aguarde alguns segundos</small>
+          </div>
+        </div>
+      </div>
+
+      <div id="products-section" style="display:none;margin-top:1rem">
         <div class="meta-grid">
-          <div style="grid-column: span 2;">
-            <label class="field-label">O que é?</label>
-            <input class="field-input" id="quick-desc" placeholder="Ex: Empréstimo João, Lanche, Uber...">
+          <div>
+            <label class="field-label">Local / Mercado</label>
+            <input class="field-input" type="text" id="meta-store" placeholder="Nome do local">
           </div>
           <div>
-            <label class="field-label">Valor</label>
-            <input class="field-input" type="number" step="0.01" min="0" id="quick-price" placeholder="R$ 0,00">
+            <label class="field-label">Data</label>
+            <input class="field-input" type="date" id="meta-date">
           </div>
           <div>
             <label class="field-label">Categoria</label>
-            <select class="field-input" id="quick-category">
-              <option value="outros">📦 Outros</option>
+            <select class="field-input" id="meta-category">
               <option value="mercado">🛒 Mercado</option>
               <option value="restaurante">🍽️ Restaurante</option>
               <option value="transporte">🚗 Transporte</option>
@@ -87,253 +161,177 @@
               <option value="moradia">🏠 Moradia</option>
               <option value="educacao">📚 Educação</option>
               <option value="roupas">👕 Roupas</option>
+              <option value="outros">📦 Outros</option>
             </select>
           </div>
           <div>
             <label class="field-label">Quem pagou?</label>
-            <select class="field-input" id="quick-payer"></select>
+            <select class="field-input" id="meta-payer"></select>
           </div>
-          <div>
-            <label class="field-label">Para quem?</label>
-            <select class="field-input" id="quick-split" onchange="document.getElementById('quick-other-div').style.display = this.value === 'other' ? 'block' : 'none'">
-              <option value="both">Dividir entre o Casal</option>
-              <option value="him">Só pra mim</option>
-              <option value="her">Só pra ela</option>
-              <option value="other">Emprestado (Terceiro)</option>
-            </select>
-          </div>
-          <div id="quick-other-div" style="grid-column: span 2; display: none;">
-            <label class="field-label">Nome de quem pegou emprestado</label>
-            <input class="field-input" id="quick-other-name" placeholder="Ex: Marcos, Mãe, etc...">
+          <div style="grid-column: span 2;">
+            <label class="field-label">Cartão/Forma de pagamento</label>
+            <input class="field-input" type="text" id="meta-method" placeholder="Ex: Cartão Nubank">
           </div>
         </div>
-        <button class="btn btn-primary" style="width:100%; margin-top:0.5rem; background: var(--other); color: #000;" onclick="window.saveQuickExpense()">💾 Salvar Lançamento</button>
+
+        <div class="products-wrap">
+          <div class="products-list-header">
+            <span>Produto</span>
+            <span>Valor</span>
+          </div>
+          <div id="products-list"></div>
+          <div class="add-manual-row">
+            <input id="new-name" placeholder="+ Produto manual..." onkeydown="if(event.key==='Enter')window.addManual()">
+            <input class="price-in" id="new-price" type="number" step="0.01" min="0" placeholder="R$" onkeydown="if(event.key==='Enter')window.addManual()">
+            <button class="btn btn-primary btn-sm" onclick="window.addManual()">+</button>
+          </div>
+        </div>
+
+        <div class="summary-row" id="summary-row"></div>
+
+        <div class="btn-row">
+          <button class="btn btn-success" onclick="window.saveReceipt()">💾 Salvar Cupom</button>
+          <button class="btn btn-ghost" onclick="window.resetAll()">✕ Descartar</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <div id="tab-content-cupom" class="tab-content">
-
-    <div class="api-banner" id="api-banner">
-      <div class="api-banner-title">🔑 Chave Google Gemini (gratuita)</div>
-      <div class="api-banner-desc">Acesse <strong>aistudio.google.com</strong> → Get API Key → Create API Key. Grátis, sem cartão.</div>
-      <input class="settings-input" type="password" id="api-key-input" placeholder="AIza..." oninput="window.saveApiKey()">
-    </div>
-
-    <div id="upload-zone" class="upload-zone">
-      <input type="file" accept="image/*" onchange="window.handleFile(event)">
-      <div class="upload-icon">📷</div>
-      <h2>Toque para fotografar o cupom</h2>
-      <p>ou arraste uma imagem aqui</p>
-    </div>
-
-    <div id="preview-section" style="display:none">
-      <img id="preview-img" class="preview-img" alt="Cupom">
-      <div class="btn-row">
-        <button class="btn btn-primary" id="extract-btn" onclick="window.extractWithGemini()">✨ Extrair com IA</button>
-        <button class="btn btn-ghost" onclick="window.resetUpload()">✕ Cancelar</button>
-      </div>
-      <div class="loading-box" id="loading-box" style="display:none;margin-top:0.75rem">
-        <div class="spinner"></div>
-        <div>
-          <strong>Gemini analisando...</strong><br>
-          <small>Aguarde alguns segundos</small>
-        </div>
-      </div>
-    </div>
-
-    <div id="products-section" style="display:none;margin-top:1rem">
-      <div class="meta-grid">
-        <div>
-          <label class="field-label">Local / Mercado</label>
-          <input class="field-input" type="text" id="meta-store" placeholder="Nome do local">
-        </div>
-        <div>
-          <label class="field-label">Data</label>
-          <input class="field-input" type="date" id="meta-date">
-        </div>
-        <div>
-          <label class="field-label">Categoria</label>
-          <select class="field-input" id="meta-category">
-            <option value="mercado">🛒 Mercado</option>
-            <option value="restaurante">🍽️ Restaurante</option>
-            <option value="transporte">🚗 Transporte</option>
-            <option value="saude">💊 Saúde</option>
-            <option value="lazer">🎉 Lazer</option>
-            <option value="moradia">🏠 Moradia</option>
-            <option value="educacao">📚 Educação</option>
-            <option value="roupas">👕 Roupas</option>
-            <option value="outros">📦 Outros</option>
-          </select>
-        </div>
-        <div>
-          <label class="field-label">Quem pagou?</label>
-          <select class="field-input" id="meta-payer"></select>
-        </div>
-        <div style="grid-column: span 2;">
-          <label class="field-label">Cartão/Forma de pagamento</label>
-          <input class="field-input" type="text" id="meta-method" placeholder="Ex: Cartão Nubank">
-        </div>
-      </div>
-
-      <div class="products-wrap">
-        <div class="products-list-header">
-          <span>Produto</span>
-          <span>Valor</span>
-        </div>
-        <div id="products-list"></div>
-        <div class="add-manual-row">
-          <input id="new-name" placeholder="+ Produto manual..." onkeydown="if(event.key==='Enter')window.addManual()">
-          <input class="price-in" id="new-price" type="number" step="0.01" min="0" placeholder="R$" onkeydown="if(event.key==='Enter')window.addManual()">
-          <button class="btn btn-primary btn-sm" onclick="window.addManual()">+</button>
-        </div>
-      </div>
-
-      <div class="summary-row" id="summary-row"></div>
-
-      <div class="btn-row">
-        <button class="btn btn-success" onclick="window.saveReceipt()">💾 Salvar Cupom</button>
-        <button class="btn btn-ghost" onclick="window.resetAll()">✕ Descartar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div id="page-history" class="page">
-  <div class="page-title">Histórico</div>
-  <div class="page-sub">Todos os cupons e lançamentos na nuvem.</div>
-  <div class="filter-bar">
-    <select class="filter-select" id="filter-month" onchange="window.renderHistory()">
-      <option value="">Todos os meses</option>
-    </select>
-    <select class="filter-select" id="filter-person" onchange="window.renderHistory()">
-      <option value="">Todos</option>
-      <option value="him">Só meus</option>
-      <option value="her">Só dela</option>
-    </select>
-    <select class="filter-select" id="filter-category" onchange="window.renderHistory()">
-      <option value="">Todas categorias</option>
-      <option value="mercado">🛒 Mercado</option>
-      <option value="restaurante">🍽️ Restaurante</option>
-      <option value="transporte">🚗 Transporte</option>
-      <option value="saude">💊 Saúde</option>
-      <option value="lazer">🎉 Lazer</option>
-      <option value="moradia">🏠 Moradia</option>
-      <option value="educacao">📚 Educação</option>
-      <option value="roupas">👕 Roupas</option>
-      <option value="outros">📦 Outros</option>
-    </select>
-  </div>
-  <div id="history-list"></div>
-</div>
-
-<div id="page-report" class="page">
-  <div class="page-title">Relatório</div>
-  <div class="page-sub">Resumo mensal e acerto de contas.</div>
-  
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
-    <select class="report-month-sel" id="report-month" onchange="window.renderReport()" style="margin-bottom:0; width:auto; flex:1; margin-right:0.5rem;">
-      <option value="">Selecione o mês</option>
-    </select>
-    <button class="btn btn-success btn-sm" onclick="window.openSettleModal()">💸 Fazer Acerto</button>
-  </div>
-  
-  <div id="report-content"></div>
-</div>
-
-<div id="page-personal" class="page">
-  <div class="page-title">Painel Pessoal</div>
-  <div class="page-sub">Controle individual de gastos e faturas.</div>
-
-  <div class="card" style="margin-bottom: 1rem; border-color: var(--him);">
-    <div class="card-header" style="padding: 0.75rem 1.25rem; display: flex; align-items: center; justify-content: space-between;">
-      <span>👤 De quem é este painel?</span>
-      <select class="filter-select" id="personal-owner" onchange="window.renderPersonalDashboard()" style="background:var(--card2); padding: 0.2rem 0.5rem; border-color:var(--border);">
-        <option value="him">Meu Painel</option>
-        <option value="her">Painel Dela</option>
+  <div id="page-history" class="page">
+    <div class="page-title">Histórico</div>
+    <div class="page-sub">Todos os cupons e lançamentos na nuvem.</div>
+    <div class="filter-bar">
+      <select class="filter-select" id="filter-month" onchange="window.renderHistory()">
+        <option value="">Todos os meses</option>
+      </select>
+      <select class="filter-select" id="filter-person" onchange="window.renderHistory()">
+        <option value="">Todos</option>
+        <option value="him">Só meus</option>
+        <option value="her">Só dela</option>
+      </select>
+      <select class="filter-select" id="filter-category" onchange="window.renderHistory()">
+        <option value="">Todas categorias</option>
+        <option value="mercado">🛒 Mercado</option>
+        <option value="restaurante">🍽️ Restaurante</option>
+        <option value="transporte">🚗 Transporte</option>
+        <option value="saude">💊 Saúde</option>
+        <option value="lazer">🎉 Lazer</option>
+        <option value="moradia">🏠 Moradia</option>
+        <option value="educacao">📚 Educação</option>
+        <option value="roupas">👕 Roupas</option>
+        <option value="outros">📦 Outros</option>
       </select>
     </div>
+    <div id="history-list"></div>
   </div>
 
-  <div id="personal-dashboard-content">
-    <div class="empty"><div class="empty-icon">⏳</div><p>Carregando painel pessoal...</p></div>
-  </div>
-</div>
-
-<div id="page-settings" class="page">
-  <div class="page-title">Configurações</div>
-  <div class="page-sub">Dados salvos na nuvem — acessíveis em qualquer dispositivo.</div>
-
-  <div class="card" style="margin-bottom:1rem">
-    <div class="card-header">👤 Nomes</div>
-    <div class="settings-row">
-      <span class="settings-label">Você</span>
-      <input class="settings-input" id="name-him" placeholder="Seu nome" oninput="window.saveNames()">
+  <div id="page-report" class="page">
+    <div class="page-title">Relatório</div>
+    <div class="page-sub">Resumo mensal e acerto de contas.</div>
+    
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+      <select class="report-month-sel" id="report-month" onchange="window.renderReport()" style="margin-bottom:0; width:auto; flex:1; margin-right:0.5rem;">
+        <option value="">Selecione o mês</option>
+      </select>
+      <button class="btn btn-success btn-sm" onclick="window.openSettleModal()">💸 Fazer Acerto</button>
     </div>
-    <div class="settings-row">
-      <span class="settings-label">Parceiro(a)</span>
-      <input class="settings-input" id="name-her" placeholder="Nome dela/dele" oninput="window.saveNames()">
-    </div>
+    
+    <div id="report-content"></div>
   </div>
 
-  <div class="card" style="margin-bottom:1rem">
-    <div class="card-header">🎯 Meta Mensal do Casal</div>
-    <div class="settings-row" style="display:block">
-      <label class="field-label">Limite de gastos do casal por mês</label>
-      <input class="settings-input" type="number" step="0.01" id="monthly-goal" placeholder="Ex: 3000.00" style="margin-top:0.4rem" oninput="window.saveGoal()">
-      <p style="font-size:0.75rem;color:var(--muted2);margin-top:0.4rem">Aparece no relatório como barra de progresso</p>
-    </div>
-  </div>
+  <div id="page-personal" class="page">
+    <div class="page-title">Painel Pessoal</div>
+    <div class="page-sub">Controle individual de gastos e faturas.</div>
 
-  <div class="card" style="margin-bottom:1rem">
-    <div class="card-header">🔑 API Key Gemini</div>
-    <div class="settings-row">
-      <input class="settings-input" type="password" id="api-key-settings" placeholder="AIza..." oninput="window.saveApiKeySettings()" style="flex:1">
+    <div class="card" style="margin-bottom: 1rem; border-color: var(--him);">
+      <div class="card-header" style="padding: 0.75rem 1.25rem; display: flex; align-items: center; justify-content: space-between;">
+        <span>👤 De quem é este painel?</span>
+        <select class="filter-select" id="personal-owner" onchange="window.renderPersonalDashboard()" style="background:var(--card2); padding: 0.2rem 0.5rem; border-color:var(--border);">
+          <option value="him">Meu Painel</option>
+          <option value="her">Painel Dela</option>
+        </select>
+      </div>
     </div>
-    <div class="settings-row" style="display:block;padding-top:0">
-      <p style="font-size:0.78rem;color:var(--muted2)">Obtenha gratuitamente em <strong style="color:var(--him)">aistudio.google.com</strong> → Get API Key → Create API Key</p>
+
+    <div id="personal-dashboard-content">
+      <div class="empty"><div class="empty-icon">⏳</div><p>Carregando painel pessoal...</p></div>
     </div>
   </div>
 
-  <div class="card" style="margin-bottom:1rem">
-    <div class="card-header">🔒 Segurança</div>
-    <div class="settings-row" style="display:block">
-      <label class="field-label">Nova senha de acesso</label>
-      <input class="settings-input" type="password" id="new-password" placeholder="Digite a nova senha..." style="margin-top:0.4rem">
-      <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" onclick="window.changePassword()">Alterar senha</button>
+  <div id="page-settings" class="page">
+    <div class="page-title">Configurações</div>
+    <div class="page-sub">Dados salvos na nuvem — acessíveis em qualquer dispositivo.</div>
+
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-header">👤 Nomes</div>
+      <div class="settings-row">
+        <span class="settings-label">Você</span>
+        <input class="settings-input" id="name-him" placeholder="Seu nome" oninput="window.saveNames()">
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">Parceiro(a)</span>
+        <input class="settings-input" id="name-her" placeholder="Nome dela/dele" oninput="window.saveNames()">
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-header">🎯 Meta Mensal do Casal</div>
+      <div class="settings-row" style="display:block">
+        <label class="field-label">Limite de gastos do casal por mês</label>
+        <input class="settings-input" type="number" step="0.01" id="monthly-goal" placeholder="Ex: 3000.00" style="margin-top:0.4rem" oninput="window.saveGoal()">
+        <p style="font-size:0.75rem;color:var(--muted2);margin-top:0.4rem">Aparece no relatório como barra de progresso</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-header">🔑 API Key Gemini</div>
+      <div class="settings-row">
+        <input class="settings-input" type="password" id="api-key-settings" placeholder="AIza..." oninput="window.saveApiKeySettings()" style="flex:1">
+      </div>
+      <div class="settings-row" style="display:block;padding-top:0">
+        <p style="font-size:0.78rem;color:var(--muted2)">Obtenha gratuitamente em <strong style="color:var(--him)">aistudio.google.com</strong> → Get API Key → Create API Key</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-header">🔒 Segurança</div>
+      <div class="settings-row" style="display:block">
+        <label class="field-label">Nova senha de acesso</label>
+        <input class="settings-input" type="password" id="new-password" placeholder="Digite a nova senha..." style="margin-top:0.4rem">
+        <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" onclick="window.changePassword()">Alterar senha</button>
+      </div>
+    </div>
+
+    <div style="margin-top:1rem;display:flex;gap:0.75rem;flex-wrap:wrap">
+      <button class="btn btn-danger btn-sm" onclick="window.clearAllData()">🗑️ Apagar todos os dados</button>
+      <button class="btn btn-ghost btn-sm" onclick="window.logout()">🚪 Sair</button>
     </div>
   </div>
 
-  <div style="margin-top:1rem;display:flex;gap:0.75rem;flex-wrap:wrap">
-    <button class="btn btn-danger btn-sm" onclick="window.clearAllData()">🗑️ Apagar todos os dados</button>
-    <button class="btn btn-ghost btn-sm" onclick="window.logout()">🚪 Sair</button>
-  </div>
-</div>
+  <nav class="bottom-nav">
+    <button class="nav-item active" id="nav-add" onclick="window.showPage('add',null,'nav-add')">
+      <span class="nav-icon">＋</span>
+      <span>Gastos</span>
+    </button>
+    <button class="nav-item" id="nav-history" onclick="window.showPage('history',null,'nav-history')">
+      <span class="nav-icon">🧾</span>
+      <span>Histórico</span>
+    </button>
+    <button class="nav-item" id="nav-report" onclick="window.showPage('report',null,'nav-report')">
+      <span class="nav-icon">📊</span>
+      <span>Relatório</span>
+    </button>
+    <button class="nav-item" id="nav-personal" onclick="window.showPage('personal',null,'nav-personal')">
+      <span class="nav-icon">👤</span>
+      <span>Pessoal</span>
+    </button>
+    <button class="nav-item" id="nav-settings" onclick="window.showPage('settings',null,'nav-settings')">
+      <span class="nav-icon">⚙️</span>
+      <span>Config</span>
+    </button>
+  </nav>
 
-<nav class="bottom-nav">
-  <button class="nav-item active" id="nav-add" onclick="window.showPage('add',null,'nav-add')">
-    <span class="nav-icon">＋</span>
-    <span>Gastos</span>
-  </button>
-  <button class="nav-item" id="nav-history" onclick="window.showPage('history',null,'nav-history')">
-    <span class="nav-icon">🧾</span>
-    <span>Histórico</span>
-  </button>
-  <button class="nav-item" id="nav-report" onclick="window.showPage('report',null,'nav-report')">
-    <span class="nav-icon">📊</span>
-    <span>Relatório</span>
-  </button>
-  <button class="nav-item" id="nav-personal" onclick="window.showPage('personal',null,'nav-personal')">
-    <span class="nav-icon">👤</span>
-    <span>Pessoal</span>
-  </button>
-  <button class="nav-item" id="nav-settings" onclick="window.showPage('settings',null,'nav-settings')">
-    <span class="nav-icon">⚙️</span>
-    <span>Config</span>
-  </button>
-</nav>
-
-</div><div id="edit-modal" class="modal-overlay" onclick="if(event.target===this)window.closeEditModal()">
+</div> <div id="edit-modal" class="modal-overlay" onclick="if(event.target===this)window.closeEditModal()">
   <div class="modal-box">
     <div class="modal-header">
       <span>✏️ Editar Lançamento</span>
@@ -389,7 +387,7 @@
     </div>
     <div class="modal-body">
       <p style="font-size: 0.85rem; color: var(--muted2); margin-bottom: 1rem;">
-        Registre aqui quando um pagar o outro (Ex: Pix para abater a conta do mês). Isso diminuirá a dívida pendente.
+        Registre aqui quando um pagar o outro (Ex: Pix para abater a conta do mês). Isso diminuirá a dívida pendente daquele mês.
       </p>
       <div class="meta-grid">
         <div style="grid-column: span 2;">
