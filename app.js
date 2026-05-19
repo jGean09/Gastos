@@ -17,7 +17,7 @@ window.showToast = function(msg, duration = 3000) {
       t.classList.add('show');
       setTimeout(() => t.classList.remove('show'), duration);
     }
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 };
 
 // ── ESTADO ──
@@ -55,19 +55,42 @@ function setSyncStatus(s) {
   } catch(e) {}
 }
 
-// ── ABAS ──
+// ── ABAS E NAVEGAÇÃO ──
 window.switchTab = function(tab) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
-  document.getElementById('tab-content-' + tab).classList.add('active');
+  try {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    document.getElementById('tab-content-' + tab).classList.add('active');
+  } catch (error) { console.error(error); }
+};
+
+window.showPage = function(id, desktopBtn, navId) {
+  try {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + id).classList.add('active');
+    
+    document.querySelectorAll('.desktop-nav-btn').forEach(b => b.classList.remove('active'));
+    if (desktopBtn) desktopBtn.classList.add('active');
+    
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    if (navId) document.getElementById(navId)?.classList.add('active');
+    
+    // CORREÇÃO: Chama a função certa para preencher o filtro de Faturas!
+    if (id === 'history') { window.populateCycleSelects(); window.renderHistory(); }
+    if (id === 'report')  { window.populateCycleSelects(); window.renderReport(); }
+    if (id === 'personal') { window.renderPersonalDashboard(); }
+  } catch (error) {
+    console.error("Erro na navegação:", error);
+    alert("Erro ao mudar de página: " + error.message);
+  }
 };
 
 window.updatePayerSelect = function() {
   try {
     const names = getNames();
     const html = `<option value="him">${names.him}</option><option value="her">${names.her}</option>`;
-    ['meta-payer', 'quick-payer', 'edit-payer', 'cycle-payer'].forEach(id => {
+    ['meta-payer', 'quick-payer', 'edit-payer', 'cycle-payer', 'settle-payer'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = html;
     });
@@ -78,10 +101,10 @@ window.updatePayerSelect = function() {
       quickSplit.options[2].text = `Só para ${names.her.split(' ')[0]}`;
       quickSplit.options[3].text = 'Emprestado (Terceiro)';
     }
-  } catch (error) {}
+  } catch (error) { console.error(error); }
 };
 
-// ── LOGIN E CONFIGURAÇÕES ──
+// ── LOGIN ──
 window.verificarSenha = function() {
   try {
     const inputEl = document.getElementById('senha-input');
@@ -99,7 +122,7 @@ window.verificarSenha = function() {
       inputEl.classList.add('shake');
       setTimeout(() => inputEl.classList.remove('shake'), 500);
     }
-  } catch (error) {}
+  } catch (error) { console.error(error); }
 };
 
 function liberarAcesso() {
@@ -110,7 +133,7 @@ function liberarAcesso() {
     setTimeout(() => { loginScreen.style.display = 'none'; }, 400);
     document.getElementById('app-content').style.display = 'block';
     initApp();
-  } catch (error) {}
+  } catch (error) { console.error(error); }
 }
 
 window.logout = function() {
@@ -118,11 +141,12 @@ window.logout = function() {
   location.reload();
 };
 
+// ── FIREBASE LOAD/SAVE ──
 async function loadSettings() {
   try {
     const snap = await getDoc(doc(db, 'config', 'settings'));
     if (snap.exists()) appSettings = { ...appSettings, ...snap.data() };
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 }
 
 async function saveSettingsToCloud() {
@@ -149,10 +173,10 @@ async function loadReceipts() {
     } catch(e2) { setSyncStatus('err'); window.showToast("❌ Erro ao baixar dados."); }
   }
   try {
-    window.populateCycleSelects();
+    window.populateCycleSelects(); // CORREÇÃO AQUI
     window.renderHistory();
     if (document.getElementById('page-personal').classList.contains('active')) window.renderPersonalDashboard();
-  } catch (error) {}
+  } catch (error) { console.error(error); }
 }
 
 async function addReceiptToCloud(receipt) {
@@ -186,7 +210,7 @@ window.deleteReceipt = async function(fireId) {
     if (isPersonal) {
       window.renderPersonalDashboard();
     } else {
-      window.populateCycleSelects();
+      window.populateCycleSelects(); // CORREÇÃO AQUI
       window.renderHistory();
       window.renderReport();
     }
@@ -208,10 +232,176 @@ window.toggleReceiptStatus = async function(fireId) {
     window.renderHistory();
     window.renderReport();
     window.showToast(newStatus === 'paid' ? '✅ Marcado como pago!' : '🔄 Reaberto!');
-  } catch(e) { setSyncStatus('err'); }
+  } catch(e) { setSyncStatus('err'); console.error(e); }
 };
 
-// ── LÓGICA DE FECHAMENTO DE FATURA (NOVO) ──
+// ── MODAL DE ACERTO (PIX SOLTO) ──
+window.openSettleModal = function() {
+  window.updatePayerSelect();
+  document.getElementById('settle-date').value = today();
+  document.getElementById('settle-amount').value = '';
+  document.getElementById('settle-modal').classList.add('open');
+};
+
+window.closeSettleModal = function() {
+  document.getElementById('settle-modal').classList.remove('open');
+};
+
+window.saveSettlement = async function() {
+  if (isSaving) return;
+  const payer = document.getElementById('settle-payer').value;
+  const amountStr = document.getElementById('settle-amount').value;
+  const date = document.getElementById('settle-date').value || today();
+
+  if (!amountStr || amountStr <= 0) { window.showToast('⚠️ Digite o valor do pagamento!'); return; }
+
+  isSaving = true;
+  const amountCents = cents(amountStr);
+  const names = getNames();
+
+  const receipt = {
+    id: Date.now(),
+    type: 'settlement',
+    store: '💸 Acerto de Contas (Pix)',
+    date: date,
+    payer: payer,
+    cycle: 'current', // Sempre atrelado à fatura aberta
+    amountCents: amountCents,
+    names: { him: names.him, her: names.her },
+    createdAt: Date.now()
+  };
+
+  const ok = await addReceiptToCloud(receipt);
+  if (ok) {
+    window.showToast('✅ Acerto registrado!');
+    window.closeSettleModal();
+    window.populateCycleSelects(); // CORREÇÃO AQUI
+    window.renderHistory();
+    window.renderReport();
+  }
+  isSaving = false;
+};
+
+// ── PAINEL PESSOAL ──
+window.renderPersonalDashboard = function() {
+  try {
+    const owner = document.getElementById('personal-owner').value; 
+    const scopeName = `personal_${owner}`;
+    
+    let list = allReceipts.filter(r => r.scope === scopeName);
+    list.sort((a,b) => b.date.localeCompare(a.date));
+
+    let incomeCents = 0;
+    let expenseCents = 0;
+
+    list.forEach(r => {
+      if (r.type === 'income') incomeCents += r.amountCents;
+      else if (r.type === 'expense') expenseCents += r.amountCents;
+    });
+
+    const balanceCents = incomeCents - expenseCents;
+    const balanceColor = balanceCents >= 0 ? 'var(--both)' : 'var(--her)';
+
+    const historyHTML = list.length === 0 
+      ? `<div class="empty"><p>Nenhum lançamento no seu painel pessoal.</p></div>` 
+      : list.map(r => {
+          const dStr = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+          const isInc = r.type === 'income';
+          const color = isInc ? 'var(--both)' : 'var(--her)';
+          const sign = isInc ? '+' : '-';
+          return `
+            <div class="store-row" style="border-bottom: 1px solid var(--border); padding: 0.75rem 0;">
+              <div style="flex:1;">
+                <div style="font-weight:700; font-size:0.85rem;">${r.store}</div>
+                <div style="font-size:0.7rem; color:var(--muted2);">${dStr}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="color:${color}; font-weight:800;">${sign} ${fmt(fromCents(r.amountCents))}</div>
+                <button class="btn-ghost" style="border:none; padding:0.2rem; font-size:0.7rem; color:var(--muted);" onclick="window.deleteReceipt('${r._fireId}')">Apagar</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+    const html = `
+      <div class="card" style="margin-bottom:1.5rem">
+        <div class="card-header">➕ Novo Lançamento Pessoal</div>
+        <div style="padding:1.25rem">
+          <div class="meta-grid">
+            <div>
+              <label class="field-label">Tipo</label>
+              <select class="field-input" id="pers-type">
+                <option value="expense">📉 Saída / Despesa</option>
+                <option value="income">📈 Entrada / Dinheiro</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label">Valor (R$)</label>
+              <input class="field-input" type="number" step="0.01" min="0" id="pers-price" placeholder="0,00">
+            </div>
+            <div style="grid-column: span 2;">
+              <label class="field-label">Descrição</label>
+              <input class="field-input" id="pers-desc" placeholder="Ex: Salário, Fatura Nubank, Ifood Sozinho...">
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%; margin-top:0.75rem;" onclick="window.savePersonalTransaction()">💾 Salvar no Pessoal</button>
+        </div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">Minhas Entradas</div>
+          <div class="stat-value" style="color:var(--both)">${fmt(fromCents(incomeCents))}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Minhas Saídas</div>
+          <div class="stat-value" style="color:var(--her)">${fmt(fromCents(expenseCents))}</div>
+        </div>
+        <div class="stat-card" style="grid-column: span 2;">
+          <div class="stat-label">Saldo em Conta / Sobra</div>
+          <div class="stat-value" style="color:${balanceColor}">${fmt(fromCents(balanceCents))}</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:1.5rem;">
+        <div class="card-header">📋 Meu Histórico</div>
+        <div style="padding:0 1.25rem 0.5rem 1.25rem;">
+          ${historyHTML}
+        </div>
+      </div>
+    `;
+    document.getElementById('personal-dashboard-content').innerHTML = html;
+  } catch (error) { console.error(error); }
+};
+
+window.savePersonalTransaction = async function() {
+  if (isSaving) return;
+  const owner = document.getElementById('personal-owner').value;
+  const type = document.getElementById('pers-type').value;
+  const price = document.getElementById('pers-price').value;
+  const desc = document.getElementById('pers-desc').value.trim();
+
+  if (!desc || !price || price <= 0) { window.showToast('⚠️ Preencha o valor e a descrição!'); return; }
+
+  isSaving = true;
+  const amountCents = cents(price);
+  const names = getNames();
+
+  const receipt = {
+    id: Date.now(), scope: `personal_${owner}`, type: type,
+    store: desc, date: today(), amountCents: amountCents,
+    names: { him: names.him, her: names.her }, createdAt: Date.now()
+  };
+
+  const ok = await addReceiptToCloud(receipt);
+  if (ok) {
+    window.showToast('✅ Lançamento salvo!');
+    window.renderPersonalDashboard();
+  }
+  isSaving = false;
+};
+
+// ── LÓGICA DE FECHAMENTO DE FATURA ──
 window.openCloseCycleModal = function() {
   window.updatePayerSelect();
   document.getElementById('cycle-date').value = today();
@@ -234,20 +424,13 @@ window.saveCloseCycle = async function() {
   
   const amountPaid = amountStr ? cents(amountStr) : 0;
   
-  // Pegamos apenas o que está na "Fatura Atual" (ou seja, cycle nulo ou 'current') e que não está 'paid'
   let activeReceipts = allReceipts.filter(r => !r.scope && (!r.cycle || r.cycle === 'current'));
-  
-  if (activeReceipts.length === 0) {
-    window.showToast('⚠️ Nenhuma conta aberta para fechar!');
-    return;
-  }
+  if (activeReceipts.length === 0) { window.showToast('⚠️ Nenhuma conta aberta!'); return; }
 
-  isSaving = true;
-  setSyncStatus('syncing');
+  isSaving = true; setSyncStatus('syncing');
 
   try {
-    // 1. Calcula a dívida EXATA do momento
-    let coupleBalanceCents = 0; // Positivo = Ela deve a Ele; Negativo = Ele deve a Ela
+    let coupleBalanceCents = 0; 
     activeReceipts.forEach(r => {
       if (r.type === 'settlement') {
          if (r.payer === 'him') coupleBalanceCents += r.amountCents;
@@ -260,100 +443,74 @@ window.saveCloseCycle = async function() {
       }
     });
 
-    // Subtrai o que a pessoa está pagando AGORA
-    if (payer === 'him') coupleBalanceCents += amountPaid; // Ele pagou, ela passa a dever mais (ou a dívida dele cai)
-    else if (payer === 'her') coupleBalanceCents -= amountPaid; // Ela pagou, a dívida dela cai
+    if (payer === 'him') coupleBalanceCents += amountPaid; 
+    else if (payer === 'her') coupleBalanceCents -= amountPaid; 
 
-    // 2. Transforma todos os cupons "current" na fatura arquivada
-    // (Atualizando um por um no Firestore)
     await Promise.all(activeReceipts.map(async r => {
       await setDoc(doc(db, 'receipts', r._fireId), { cycle: cycleName }, { merge: true });
-      r.cycle = cycleName; // Atualiza a memória local tbm
+      r.cycle = cycleName; 
     }));
 
-    // 3. Se teve pagamento, registra o Pix de acerto DENTRO da fatura arquivada pra fechar a matemática dela
     if (amountPaid > 0) {
       const names = getNames();
       const settlement = {
-        id: Date.now(), type: 'settlement', store: '💸 Pix / Acerto de Contas',
-        date, payer, amountCents: amountPaid, cycle: cycleName, // Fica dentro do arquivo
+        id: Date.now(), type: 'settlement', store: '💸 Pix / Acerto Final',
+        date, payer, amountCents: amountPaid, cycle: cycleName, 
         names: { him: names.him, her: names.her }, createdAt: Date.now()
       };
       await addReceiptToCloud(settlement);
     }
 
-    // 4. Se a dívida não zerou (Sobrou saldo), criamos um recibo na NOVA "Fatura Atual"
     if (coupleBalanceCents !== 0) {
       const names = getNames();
-      let rollPayer = '';
-      let rHimC = 0, rHerC = 0;
-      let splitType = '';
+      let rollPayer = ''; let rHimC = 0, rHerC = 0; let splitType = '';
       let itemPrice = Math.abs(coupleBalanceCents);
 
-      if (coupleBalanceCents > 0) {
-        // Ela deve a ele. Simula um recibo onde ELE pagou tudo, e ELA deve tudo.
-        rollPayer = 'him'; rHerC = itemPrice; splitType = 'her';
-      } else {
-        // Ele deve a ela.
-        rollPayer = 'her'; rHimC = itemPrice; splitType = 'him';
-      }
+      if (coupleBalanceCents > 0) { rollPayer = 'him'; rHerC = itemPrice; splitType = 'her'; } 
+      else { rollPayer = 'her'; rHimC = itemPrice; splitType = 'him'; }
 
-      const rolloverItem = { id: Date.now(), name: 'Dívida pendente de ' + cycleName, priceCents: itemPrice, split: splitType, otherName: '' };
-      
+      const rolloverItem = { id: Date.now(), name: 'Dívida pendente: ' + cycleName, priceCents: itemPrice, split: splitType, otherName: '' };
       const rolloverReceipt = {
-        id: Date.now(),
-        type: 'rollover',
-        store: `Restante ref: ${cycleName}`,
-        date: date,
-        payer: rollPayer,
-        method: 'Saldo Acumulado',
-        category: 'outros',
-        status: 'open',
-        cycle: 'current', // Entra na fatura nova, limpinha!
-        items: [rolloverItem],
-        himCents: rHimC, herCents: rHerC, otherCents: 0, coupleCents: itemPrice, totalCents: itemPrice,
+        id: Date.now(), type: 'rollover', store: `Restante ref: ${cycleName}`,
+        date: date, payer: rollPayer, method: 'Saldo Acumulado', category: 'outros', status: 'open', cycle: 'current',
+        items: [rolloverItem], himCents: rHimC, herCents: rHerC, otherCents: 0, coupleCents: itemPrice, totalCents: itemPrice,
         imageBase64: null, imageMime: null, names: { him: names.him, her: names.her }, createdAt: Date.now() + 1000
       };
-
       await addReceiptToCloud(rolloverReceipt);
     }
 
     window.showToast('✅ Fatura Fechada com Sucesso!');
     window.closeCycleModal();
-    window.populateCycleSelects();
+    window.populateCycleSelects(); 
     
-    // Reseta o filtro para ver a Fatura Atual limpinha
     document.getElementById('filter-cycle').value = 'current';
     document.getElementById('report-cycle').value = 'current';
     
     window.renderHistory();
     window.renderReport();
-
   } catch (e) {
-    setSyncStatus('err');
-    window.showToast('❌ Erro no fechamento: ' + e.message);
-  } finally {
-    isSaving = false;
-  }
+    setSyncStatus('err'); window.showToast('❌ Erro no fechamento: ' + e.message); console.error(e);
+  } finally { isSaving = false; }
 };
 
-
-// ── MODAL DE EDIÇÃO ──
+// ── MODAL DE EDIÇÃO NORMAL ──
 window.openEditModal = function(fireId) {
-  const receipt = allReceipts.find(r => r._fireId === fireId);
-  if (!receipt) return;
-  editingFireId = fireId;
-  editingItems = receipt.items.map(i => ({ ...i }));
+  try {
+    const receipt = allReceipts.find(r => r._fireId === fireId);
+    if (!receipt) return;
+    editingFireId = fireId;
+    editingItems = receipt.items.map(i => ({ ...i }));
 
-  document.getElementById('edit-store').value = receipt.store || '';
-  document.getElementById('edit-date').value = receipt.date || today();
-  document.getElementById('edit-method').value = receipt.method || '';
-  document.getElementById('edit-category').value = receipt.category || 'outros';
-  window.updatePayerSelect();
-  document.getElementById('edit-payer').value = receipt.payer || 'him';
+    document.getElementById('edit-store').value = receipt.store || '';
+    document.getElementById('edit-date').value = receipt.date || today();
+    document.getElementById('edit-method').value = receipt.method || '';
+    document.getElementById('edit-category').value = receipt.category || 'outros';
+    window.updatePayerSelect();
+    document.getElementById('edit-payer').value = receipt.payer || 'him';
 
-  renderEditItems();
-  document.getElementById('edit-modal').classList.add('open');
+    renderEditItems();
+    document.getElementById('edit-modal').classList.add('open');
+  } catch(e) { console.error(e); }
 };
 
 window.closeEditModal = function() {
@@ -432,7 +589,7 @@ window.saveEditModal = async function() {
     window.renderHistory();
     window.renderReport();
     window.showToast('✅ Lançamento atualizado!');
-  } catch(e) { window.showToast('❌ Erro: ' + e.message); } finally { isSaving = false; }
+  } catch(e) { window.showToast('❌ Erro: ' + e.message); console.error(e); } finally { isSaving = false; }
 };
 
 // ── BOOT E INIT ──
@@ -442,7 +599,7 @@ async function checkAuthAndBoot() {
     const senhaInput = document.getElementById('senha-input');
     if (senhaInput) senhaInput.addEventListener('keydown', e => { if (e.key === 'Enter') window.verificarSenha(); });
     if (localStorage.getItem('casal_auth') === 'ok') liberarAcesso();
-  } catch (error) {}
+  } catch (error) { console.error("Erro no boot:", error); }
 }
 
 async function initApp() {
@@ -463,10 +620,10 @@ async function initApp() {
       zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('dragover'); if (e.dataTransfer.files[0]) window.loadFile(e.dataTransfer.files[0]); });
     }
     await loadReceipts();
-  } catch (error) {}
+  } catch (error) { console.error("Erro ao inicializar", error); }
 }
 
-// ── LANÇAMENTO RÁPIDO DO CASAL ──
+// ── LANÇAMENTO RÁPIDO ──
 window.saveQuickExpense = async function() {
   try {
     if (isSaving) return;
@@ -492,7 +649,7 @@ window.saveQuickExpense = async function() {
     const names = getNames();
     const receipt = {
       id: Date.now(), store: 'Lançamento Avulso', date: today(), payer, method: 'Avulso', category, status: 'open',
-      cycle: 'current', // Fica atrelado à fatura aberta
+      cycle: 'current', 
       items: [item], himCents: himC, herCents: herC, otherCents: otherC, coupleCents: himC + herC, totalCents: himC + herC + otherC,
       imageBase64: null, imageMime: null, names: { him: names.him, her: names.her }, createdAt: Date.now()
     };
@@ -506,10 +663,10 @@ window.saveQuickExpense = async function() {
       document.getElementById('quick-other-div').style.display = 'none';
       document.getElementById('quick-split').value = 'both';
       document.getElementById('quick-category').value = 'outros';
-      window.populateCycleSelects();
+      window.populateCycleSelects(); // CORREÇÃO AQUI
       window.renderHistory();
     }
-  } catch (error) {} finally { isSaving = false; }
+  } catch (error) { console.error(error); } finally { isSaving = false; }
 };
 
 // ── CONFIGURAÇÕES E DADOS GERAIS ──
@@ -527,15 +684,15 @@ window.clearAllData = async function() {
     await Promise.all(snap.docs.map(d => deleteDoc(doc(db, 'receipts', d.id))));
     allReceipts = [];
     setSyncStatus('ok');
-    window.populateCycleSelects();
+    window.populateCycleSelects(); // CORREÇÃO AQUI
     window.renderHistory();
     window.renderReport();
     if (document.getElementById('page-personal').classList.contains('active')) window.renderPersonalDashboard();
     window.showToast('🗑️ Limpeza concluída.');
-  } catch(e) { setSyncStatus('err'); }
+  } catch(e) { setSyncStatus('err'); console.error(e); }
 };
 
-// ── LER CUPOM COM GEMINI E COMPRESSÃO ──
+// ── LER CUPOM COM GEMINI ──
 window.handleFile = function(e) { if (e.target.files[0]) window.loadFile(e.target.files[0]); };
 window.loadFile = function(file) {
   try {
@@ -560,7 +717,7 @@ window.loadFile = function(file) {
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
-  } catch (error) {}
+  } catch (error) { console.error(error); }
 };
 window.resetUpload = function() {
   currentFile = null; currentBase64 = null; currentProducts = []; nextId = 0;
@@ -587,7 +744,7 @@ window.extractWithGemini = async function() {
     window.renderProducts();
     document.getElementById('products-section').style.display = 'block';
     window.showToast('✅ Extraído!');
-  } catch(err) { window.showToast('❌ Falha na IA.'); } 
+  } catch(err) { window.showToast('❌ Falha na IA.'); console.error(err); } 
   finally {
     const b = document.getElementById('extract-btn'); if(b) b.disabled = false;
     const bx = document.getElementById('loading-box'); if(bx) bx.style.display = 'none';
@@ -654,7 +811,7 @@ window.saveReceipt = async function() {
   const receipt = {
     id: Date.now(), store: document.getElementById('meta-store').value.trim() || 'Sem nome', date: document.getElementById('meta-date').value || today(),
     payer: document.getElementById('meta-payer').value || 'him', method: document.getElementById('meta-method').value.trim(), category: document.getElementById('meta-category').value || 'outros', status: 'open',
-    cycle: 'current', // Fica na fatura atual!
+    cycle: 'current', 
     items: currentProducts.map(p => ({ ...p })), himCents: himC, herCents: herC, otherCents: otherC, coupleCents: himC + herC, totalCents: himC + herC + otherC,
     imageBase64: currentBase64, imageMime: currentMime, names: { him: names.him, her: names.her }, createdAt: Date.now()
   };
@@ -663,74 +820,7 @@ window.saveReceipt = async function() {
   isSaving = false;
 };
 
-// ── PAINEL PESSOAL ──
-window.renderPersonalDashboard = function() {
-  const owner = document.getElementById('personal-owner').value;
-  const scopeName = `personal_${owner}`;
-  const names = getNames();
-  
-  let list = allReceipts.filter(r => r.scope === scopeName);
-  list.sort((a,b) => b.date.localeCompare(a.date));
-
-  let incomeCents = 0; let expenseCents = 0;
-  list.forEach(r => { if (r.type === 'income') incomeCents += r.amountCents; else if (r.type === 'expense') expenseCents += r.amountCents; });
-
-  const balanceCents = incomeCents - expenseCents;
-  const balanceColor = balanceCents >= 0 ? 'var(--both)' : 'var(--her)';
-
-  const historyHTML = list.length === 0 ? `<div class="empty"><p>Nenhum lançamento pessoal.</p></div>` : list.map(r => {
-    const dStr = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-    const isInc = r.type === 'income'; const color = isInc ? 'var(--both)' : 'var(--her)'; const sign = isInc ? '+' : '-';
-    return `<div class="store-row" style="border-bottom: 1px solid var(--border); padding: 0.75rem 0;">
-      <div style="flex:1;"><div style="font-weight:700; font-size:0.85rem;">${r.store}</div><div style="font-size:0.7rem; color:var(--muted2);">${dStr}</div></div>
-      <div style="text-align:right;">
-        <div style="color:${color}; font-weight:800;">${sign} ${fmt(fromCents(r.amountCents))}</div>
-        <button class="btn-ghost" style="border:none; padding:0.2rem; font-size:0.7rem; color:var(--muted);" onclick="window.deleteReceipt('${r._fireId}')">Apagar</button>
-      </div>
-    </div>`;
-  }).join('');
-
-  document.getElementById('personal-dashboard-content').innerHTML = `
-    <div class="card" style="margin-bottom:1.5rem"><div class="card-header">➕ Novo Lançamento Pessoal</div>
-      <div style="padding:1.25rem"><div class="meta-grid">
-          <div><label class="field-label">Tipo</label><select class="field-input" id="pers-type"><option value="expense">📉 Saída / Despesa</option><option value="income">📈 Entrada</option></select></div>
-          <div><label class="field-label">Valor (R$)</label><input class="field-input" type="number" step="0.01" min="0" id="pers-price" placeholder="0,00"></div>
-          <div style="grid-column: span 2;"><label class="field-label">Descrição</label><input class="field-input" id="pers-desc" placeholder="Ex: Salário, Fatura Nubank..."></div>
-        </div><button class="btn btn-primary" style="width:100%; margin-top:0.75rem;" onclick="window.savePersonalTransaction()">💾 Salvar no Pessoal</button></div></div>
-    <div class="stat-grid">
-      <div class="stat-card"><div class="stat-label">Minhas Entradas</div><div class="stat-value" style="color:var(--both)">${fmt(fromCents(incomeCents))}</div></div>
-      <div class="stat-card"><div class="stat-label">Minhas Saídas</div><div class="stat-value" style="color:var(--her)">${fmt(fromCents(expenseCents))}</div></div>
-      <div class="stat-card" style="grid-column: span 2;"><div class="stat-label">Saldo em Conta / Sobra</div><div class="stat-value" style="color:${balanceColor}">${fmt(fromCents(balanceCents))}</div></div>
-    </div>
-    <div class="card" style="margin-top:1.5rem;"><div class="card-header">📋 Meu Histórico</div><div style="padding:0 1.25rem 0.5rem 1.25rem;">${historyHTML}</div></div>
-  `;
-};
-
-window.savePersonalTransaction = async function() {
-  if (isSaving) return;
-  const owner = document.getElementById('personal-owner').value;
-  const type = document.getElementById('pers-type').value;
-  const price = document.getElementById('pers-price').value;
-  const desc = document.getElementById('pers-desc').value.trim();
-
-  if (!desc || !price || price <= 0) { window.showToast('⚠️ Preencha o valor e a descrição!'); return; }
-
-  isSaving = true;
-  const amountCents = cents(price);
-  const names = getNames();
-
-  const receipt = {
-    id: Date.now(), scope: `personal_${owner}`, type: type,
-    store: desc, date: today(), amountCents: amountCents,
-    names: { him: names.him, her: names.her }, createdAt: Date.now()
-  };
-
-  const ok = await addReceiptToCloud(receipt);
-  if (ok) { window.showToast('✅ Salvo!'); window.renderPersonalDashboard(); }
-  isSaving = false;
-};
-
-// ── RENDERIZAÇÃO DE HISTÓRICO E RELATÓRIO (Com filtro de Ciclo) ──
+// ── RENDERIZAÇÃO DE HISTÓRICO E RELATÓRIO ──
 function buildDonutSVG(segments) {
   const total = segments.reduce((s, seg) => s + seg.value, 0); if (total === 0) return '';
   const r = 52, cx = 60, cy = 60, stroke = 16; const circ = 2 * Math.PI * r; let offset = 0, paths = '';
@@ -742,30 +832,26 @@ function buildDonutSVG(segments) {
   return `<svg class="donut-svg" viewBox="0 0 120 120" width="120" height="120"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--card2)" stroke-width="${stroke}"/>${paths}</svg>`;
 }
 
-// ── PREENCHER DROPDOWNS COM NOMES DAS FATURAS ──
 window.populateCycleSelects = function() {
   try {
     const list = allReceipts.filter(r => !r.scope && r.cycle && r.cycle !== 'current');
-    const cycles = [...new Set(list.map(r => r.cycle))]; // Pega os nomes das faturas passadas
+    const cycles = [...new Set(list.map(r => r.cycle))]; 
     ['filter-cycle', 'report-cycle'].forEach(sid => {
       const sel = document.getElementById(sid); if (!sel) return;
-      // Mantém a primeira opção intocada ("Fatura Atual")
       const first = sel.options[0].cloneNode(true); sel.innerHTML = ''; sel.appendChild(first);
       cycles.forEach(c => {
         const opt = document.createElement('option'); opt.value = c; opt.textContent = "📁 " + c; sel.appendChild(opt);
       });
     });
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 };
 
 window.renderHistory = function() {
   try {
-    // Agora o filtro olha para o ciclo/fatura, não só para a string da data.
     const cycle = document.getElementById('filter-cycle')?.value || 'current';
     const person = document.getElementById('filter-person')?.value || '';
     const category = document.getElementById('filter-category')?.value || '';
     
-    // Pega só contas do casal e atreladas à fatura correta
     let list = allReceipts.filter(r => !r.scope);
     
     if (cycle === 'current') {
@@ -790,7 +876,6 @@ window.renderHistory = function() {
       const dateStr = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
       const fid = r._fireId;
 
-      // ── CARD DE ACERTO (PIX) DENTRO DO HISTÓRICO ──
       if (r.type === 'settlement') {
         const payerName = r.payer === 'him' ? names.him : names.her;
         const color = r.payer === 'him' ? 'var(--him)' : 'var(--her)';
@@ -808,42 +893,30 @@ window.renderHistory = function() {
         </div>`;
       }
 
-      // ── CARD NORMAL (EXPANSÍVEL) ──
       const himC = r.himCents || 0; const herC = r.herCents || 0; const otherC = r.otherCents || 0;
       const isPaid = r.status === 'paid';
       const payerName = r.payer === 'him' ? names.him : (r.payer === 'her' ? names.her : '');
       const methodStr = r.method ? ` (${r.method})` : '';
       const cat = catLabel(r.category || 'outros');
-
-      const statusBadge = isPaid
-        ? `<span style="background:var(--both-bg);color:var(--both);padding:0.15rem 0.4rem;border-radius:10px;font-size:0.62rem;font-weight:800;margin-left:0.4rem;">✅ PAGO</span>`
-        : `<span style="background:var(--other-bg);color:var(--other);padding:0.15rem 0.4rem;border-radius:10px;font-size:0.62rem;font-weight:800;margin-left:0.4rem;">⏳ EM ABERTO</span>`;
+      const statusBadge = isPaid ? `<span class="item-badge badge-both">✅ PAGO</span>` : `<span class="item-badge badge-other">⏳ ABERTO</span>`;
 
       const itemRows = r.items.map(item => {
         const iC = item.priceCents || 0;
-        const badgeClass = item.split === 'him' ? 'badge-him' : item.split === 'her' ? 'badge-her' : item.split === 'other' ? 'badge-other' : 'badge-both';
         const badgeLabel = item.split === 'him' ? names.him.split(' ')[0] : item.split === 'her' ? names.her.split(' ')[0] : item.split === 'other' ? (item.otherName || '?') : '÷2';
-        return `<div class="receipt-item-row"><span style="flex:1">${item.name}</span><span class="item-badge ${badgeClass}">${badgeLabel}</span><span style="font-weight:700;color:var(--both)">${fmt(fromCents(iC))}</span></div>`;
+        return `<div class="receipt-item-row"><span style="flex:1">${item.name}</span><span class="item-badge">${badgeLabel}</span><span style="font-weight:700;color:var(--both)">${fmt(fromCents(iC))}</span></div>`;
       }).join('');
-
       const imgSrc = r.imageBase64 ? `data:${r.imageMime || 'image/jpeg'};base64,${r.imageBase64}` : '';
 
       return `<div class="receipt-card" style="${isPaid ? 'opacity:0.72;' : ''}animation-delay:${idx * 0.04}s">
         <div class="receipt-head" onclick="window.toggleCard('${fid}')">
           <div style="min-width:0">
-            <div class="receipt-store">${r.store}</div>
-            <div class="receipt-date" style="display:flex;align-items:center;flex-wrap:wrap;gap:0.2rem;margin-top:0.2rem">
-              ${dateStr} ${statusBadge}
-            </div>
-            <div style="margin-top:0.25rem">
-              <span class="category-badge">${cat}</span>
-              ${payerName ? `<span style="font-size:0.7rem;color:var(--muted2);margin-left:0.35rem">por <strong>${payerName}</strong>${methodStr}</span>` : ''}
-            </div>
+            <div class="receipt-store">${r.store} ${statusBadge}</div>
+            <div class="receipt-date">${dateStr} • Por ${payerName}${methodStr}</div>
+            <div style="margin-top:0.25rem"><span class="category-badge">${cat}</span></div>
           </div>
           <div class="receipt-amounts">
-            <div class="receipt-amount-item"><div class="amount-dot" style="background:var(--him)"></div><span style="color:var(--him)">${fmt(fromCents(himC))}</span></div>
-            <div class="receipt-amount-item"><div class="amount-dot" style="background:var(--her)"></div><span style="color:var(--her)">${fmt(fromCents(herC))}</span></div>
-            ${otherC > 0 ? `<div class="receipt-amount-item"><div class="amount-dot" style="background:var(--other)"></div><span style="color:var(--other)">${fmt(fromCents(otherC))}</span></div>` : ''}
+            <div class="receipt-amount-item"><div class="amount-dot" style="background:var(--him)"></div><span>${fmt(fromCents(himC))}</span></div>
+            <div class="receipt-amount-item"><div class="amount-dot" style="background:var(--her)"></div><span>${fmt(fromCents(herC))}</span></div>
           </div>
         </div>
         <div class="receipt-body" id="card-body-${fid}">
@@ -857,20 +930,16 @@ window.renderHistory = function() {
         </div>
       </div>`;
     }).join('');
-  } catch (error) {
-    window.showToast("Erro ao renderizar histórico: " + error.message);
-  }
+  } catch (error) { console.error(error); }
 };
 
 window.toggleCard = function(id) {
-  try { document.getElementById('card-body-' + id)?.classList.toggle('open'); } catch(e) {}
+  try { document.getElementById('card-body-' + id)?.classList.toggle('open'); } catch(e) { console.error(e); }
 };
 
 window.renderReport = function() {
   try {
     const cycle = document.getElementById('report-cycle')?.value || 'current';
-    
-    // Pega APENAS as contas do casal, sem o painel pessoal, pertencentes à fatura selecionada
     let list = allReceipts.filter(r => !r.scope);
     if (cycle === 'current') {
        list = list.filter(r => !r.cycle || r.cycle === 'current');
@@ -922,27 +991,14 @@ window.renderReport = function() {
 
     let settlementHTML = '';
     if (runningBalanceCents > 0) {
-      settlementHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--both)">
-        <div class="card-header" style="color:var(--both)">🤝 Acerto (Nesta Fatura)</div>
-        <div style="padding:1.25rem;text-align:center">
-          <div style="font-size:0.85rem;color:var(--muted2);margin-bottom:0.4rem">${names.her} deve pagar para ${names.him}</div>
-          <div style="font-size:2rem;font-weight:900;color:var(--both);letter-spacing:-1px">${fmt(fromCents(runningBalanceCents))}</div>
-        </div></div>`;
+      settlementHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--both)"><div class="card-header" style="color:var(--both)">🤝 Acerto (Nesta Fatura)</div><div style="padding:1.25rem;text-align:center"><div style="font-size:0.85rem;color:var(--muted2);margin-bottom:0.4rem">${names.her} deve pagar para ${names.him}</div><div style="font-size:2rem;font-weight:900;color:var(--both);letter-spacing:-1px">${fmt(fromCents(runningBalanceCents))}</div></div></div>`;
     } else if (runningBalanceCents < 0) {
-      settlementHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--her)">
-        <div class="card-header" style="color:var(--her)">🤝 Acerto (Nesta Fatura)</div>
-        <div style="padding:1.25rem;text-align:center">
-          <div style="font-size:0.85rem;color:var(--muted2);margin-bottom:0.4rem">${names.him} deve pagar para ${names.her}</div>
-          <div style="font-size:2rem;font-weight:900;color:var(--her);letter-spacing:-1px">${fmt(fromCents(Math.abs(runningBalanceCents)))}</div>
-        </div></div>`;
+      settlementHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--her)"><div class="card-header" style="color:var(--her)">🤝 Acerto (Nesta Fatura)</div><div style="padding:1.25rem;text-align:center"><div style="font-size:0.85rem;color:var(--muted2);margin-bottom:0.4rem">${names.him} deve pagar para ${names.her}</div><div style="font-size:2rem;font-weight:900;color:var(--her);letter-spacing:-1px">${fmt(fromCents(Math.abs(runningBalanceCents)))}</div></div></div>`;
     } else {
-      settlementHTML = `<div class="card" style="margin-bottom:1rem">
-        <div class="card-header">🤝 Acerto (Nesta Fatura)</div>
-        <div style="padding:1.25rem;text-align:center;font-weight:700;color:var(--both)">Tudo quite nesta fatura! ✅</div>
-      </div>`;
+      settlementHTML = `<div class="card" style="margin-bottom:1rem"><div class="card-header">🤝 Acerto (Nesta Fatura)</div><div style="padding:1.25rem;text-align:center;font-weight:700;color:var(--both)">Tudo quite nesta fatura! ✅</div></div>`;
     }
 
-    let listGastos = list.filter(r => r.type !== 'settlement');
+    let listGastos = list.filter(r => r.type !== 'settlement' && r.type !== 'rollover');
 
     if (!listGastos.length && runningBalanceCents === 0) {
       container.innerHTML = `${settlementHTML}<div class="empty"><div class="empty-icon">📊</div><p>Nenhum dado nesta fatura.</p></div>`;
@@ -1001,10 +1057,9 @@ window.renderReport = function() {
       <div class="card" style="margin-bottom:1rem"><div class="card-header">🧾 ${listGastos.length} contas na fatura</div><div style="padding:0 1.25rem">${receiptRows}</div></div>
       ${exportBtn}
     `;
-  } catch (error) {}
+  } catch (error) { console.error(error); }
 };
 
-// ── EXPORTAR CSV ──
 window.exportCSV = function() {
   try {
     const cycle = document.getElementById('report-cycle')?.value || 'current';
@@ -1030,7 +1085,7 @@ window.exportCSV = function() {
     const url = URL.createObjectURL(blob); const a = document.createElement('a');
     a.href = url; a.download = `gastos_casal_${cycle}.csv`; a.click(); URL.revokeObjectURL(url);
     window.showToast('📥 CSV exportado!');
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 };
 
 checkAuthAndBoot();
