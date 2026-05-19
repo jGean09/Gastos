@@ -9,7 +9,6 @@ window.addEventListener('unhandledrejection', function(event) {
   console.error("Erro Firebase:", event.reason ? event.reason.message : "Desconhecido");
 });
 
-// ── TOAST ──
 window.showToast = function(msg, duration = 3000) {
   try {
     const t = document.getElementById('toast');
@@ -56,7 +55,7 @@ function setSyncStatus(s) {
   } catch(e) {}
 }
 
-// ── ABAS E NAVEGAÇÃO ──
+// ── ABAS ──
 window.switchTab = function(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -64,27 +63,11 @@ window.switchTab = function(tab) {
   document.getElementById('tab-content-' + tab).classList.add('active');
 };
 
-window.showPage = function(id, desktopBtn, navId) {
-  try {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.getElementById('page-' + id).classList.add('active');
-    document.querySelectorAll('.desktop-nav-btn').forEach(b => b.classList.remove('active'));
-    if (desktopBtn) desktopBtn.classList.add('active');
-    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-    if (navId) document.getElementById(navId)?.classList.add('active');
-    
-    if (id === 'history') { window.populateMonthSelects(); window.renderHistory(); }
-    if (id === 'report')  { window.populateMonthSelects(); window.renderReport(); }
-    if (id === 'personal') { window.renderPersonalDashboard(); }
-  } catch (error) {}
-};
-
-// ── ATUALIZAR SELECTS DE PAGADOR ──
 window.updatePayerSelect = function() {
   try {
     const names = getNames();
     const html = `<option value="him">${names.him}</option><option value="her">${names.her}</option>`;
-    ['meta-payer', 'quick-payer', 'edit-payer', 'settle-payer'].forEach(id => {
+    ['meta-payer', 'quick-payer', 'edit-payer', 'cycle-payer'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = html;
     });
@@ -98,7 +81,7 @@ window.updatePayerSelect = function() {
   } catch (error) {}
 };
 
-// ── LOGIN ──
+// ── LOGIN E CONFIGURAÇÕES ──
 window.verificarSenha = function() {
   try {
     const inputEl = document.getElementById('senha-input');
@@ -135,7 +118,6 @@ window.logout = function() {
   location.reload();
 };
 
-// ── FIREBASE LOAD/SAVE ──
 async function loadSettings() {
   try {
     const snap = await getDoc(doc(db, 'config', 'settings'));
@@ -167,7 +149,7 @@ async function loadReceipts() {
     } catch(e2) { setSyncStatus('err'); window.showToast("❌ Erro ao baixar dados."); }
   }
   try {
-    window.populateMonthSelects();
+    window.populateCycleSelects();
     window.renderHistory();
     if (document.getElementById('page-personal').classList.contains('active')) window.renderPersonalDashboard();
   } catch (error) {}
@@ -204,7 +186,7 @@ window.deleteReceipt = async function(fireId) {
     if (isPersonal) {
       window.renderPersonalDashboard();
     } else {
-      window.populateMonthSelects();
+      window.populateCycleSelects();
       window.renderHistory();
       window.renderReport();
     }
@@ -229,171 +211,134 @@ window.toggleReceiptStatus = async function(fireId) {
   } catch(e) { setSyncStatus('err'); }
 };
 
-// ── MODAL DE ACERTO (PIX) ──
-window.openSettleModal = function() {
+// ── LÓGICA DE FECHAMENTO DE FATURA (NOVO) ──
+window.openCloseCycleModal = function() {
   window.updatePayerSelect();
-  document.getElementById('settle-date').value = today();
-  document.getElementById('settle-modal').classList.add('open');
+  document.getElementById('cycle-date').value = today();
+  document.getElementById('cycle-name').value = '';
+  document.getElementById('cycle-amount').value = '';
+  document.getElementById('close-cycle-modal').classList.add('open');
 };
 
-window.closeSettleModal = function() {
-  document.getElementById('settle-modal').classList.remove('open');
+window.closeCycleModal = function() {
+  document.getElementById('close-cycle-modal').classList.remove('open');
 };
 
-window.saveSettlement = async function() {
+window.saveCloseCycle = async function() {
   if (isSaving) return;
-  const payer = document.getElementById('settle-payer').value;
-  const amountStr = document.getElementById('settle-amount').value;
-  const date = document.getElementById('settle-date').value || today();
-
-  if (!amountStr || amountStr <= 0) { window.showToast('⚠️ Digite o valor do pagamento!'); return; }
+  
+  const cycleName = document.getElementById('cycle-name').value.trim() || 'Fatura ' + today();
+  const payer = document.getElementById('cycle-payer').value;
+  const amountStr = document.getElementById('cycle-amount').value;
+  const date = document.getElementById('cycle-date').value || today();
+  
+  const amountPaid = amountStr ? cents(amountStr) : 0;
+  
+  // Pegamos apenas o que está na "Fatura Atual" (ou seja, cycle nulo ou 'current') e que não está 'paid'
+  let activeReceipts = allReceipts.filter(r => !r.scope && (!r.cycle || r.cycle === 'current'));
+  
+  if (activeReceipts.length === 0) {
+    window.showToast('⚠️ Nenhuma conta aberta para fechar!');
+    return;
+  }
 
   isSaving = true;
-  const amountCents = cents(amountStr);
-  const names = getNames();
+  setSyncStatus('syncing');
 
-  const receipt = {
-    id: Date.now(),
-    type: 'settlement',
-    store: '💸 Acerto de Contas (Pix)',
-    date: date,
-    payer: payer,
-    amountCents: amountCents,
-    names: { him: names.him, her: names.her },
-    createdAt: Date.now()
-  };
+  try {
+    // 1. Calcula a dívida EXATA do momento
+    let coupleBalanceCents = 0; // Positivo = Ela deve a Ele; Negativo = Ele deve a Ela
+    activeReceipts.forEach(r => {
+      if (r.type === 'settlement') {
+         if (r.payer === 'him') coupleBalanceCents += r.amountCents;
+         else if (r.payer === 'her') coupleBalanceCents -= r.amountCents;
+      } else if (r.status !== 'paid') {
+         const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0);
+         const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
+         if (r.payer === 'him') coupleBalanceCents += rHerC;
+         else if (r.payer === 'her') coupleBalanceCents -= rHimC;
+      }
+    });
 
-  const ok = await addReceiptToCloud(receipt);
-  if (ok) {
-    window.showToast('✅ Acerto registrado!');
-    document.getElementById('settle-amount').value = '';
-    window.closeSettleModal();
-    window.populateMonthSelects();
+    // Subtrai o que a pessoa está pagando AGORA
+    if (payer === 'him') coupleBalanceCents += amountPaid; // Ele pagou, ela passa a dever mais (ou a dívida dele cai)
+    else if (payer === 'her') coupleBalanceCents -= amountPaid; // Ela pagou, a dívida dela cai
+
+    // 2. Transforma todos os cupons "current" na fatura arquivada
+    // (Atualizando um por um no Firestore)
+    await Promise.all(activeReceipts.map(async r => {
+      await setDoc(doc(db, 'receipts', r._fireId), { cycle: cycleName }, { merge: true });
+      r.cycle = cycleName; // Atualiza a memória local tbm
+    }));
+
+    // 3. Se teve pagamento, registra o Pix de acerto DENTRO da fatura arquivada pra fechar a matemática dela
+    if (amountPaid > 0) {
+      const names = getNames();
+      const settlement = {
+        id: Date.now(), type: 'settlement', store: '💸 Pix / Acerto de Contas',
+        date, payer, amountCents: amountPaid, cycle: cycleName, // Fica dentro do arquivo
+        names: { him: names.him, her: names.her }, createdAt: Date.now()
+      };
+      await addReceiptToCloud(settlement);
+    }
+
+    // 4. Se a dívida não zerou (Sobrou saldo), criamos um recibo na NOVA "Fatura Atual"
+    if (coupleBalanceCents !== 0) {
+      const names = getNames();
+      let rollPayer = '';
+      let rHimC = 0, rHerC = 0;
+      let splitType = '';
+      let itemPrice = Math.abs(coupleBalanceCents);
+
+      if (coupleBalanceCents > 0) {
+        // Ela deve a ele. Simula um recibo onde ELE pagou tudo, e ELA deve tudo.
+        rollPayer = 'him'; rHerC = itemPrice; splitType = 'her';
+      } else {
+        // Ele deve a ela.
+        rollPayer = 'her'; rHimC = itemPrice; splitType = 'him';
+      }
+
+      const rolloverItem = { id: Date.now(), name: 'Dívida pendente de ' + cycleName, priceCents: itemPrice, split: splitType, otherName: '' };
+      
+      const rolloverReceipt = {
+        id: Date.now(),
+        type: 'rollover',
+        store: `Restante ref: ${cycleName}`,
+        date: date,
+        payer: rollPayer,
+        method: 'Saldo Acumulado',
+        category: 'outros',
+        status: 'open',
+        cycle: 'current', // Entra na fatura nova, limpinha!
+        items: [rolloverItem],
+        himCents: rHimC, herCents: rHerC, otherCents: 0, coupleCents: itemPrice, totalCents: itemPrice,
+        imageBase64: null, imageMime: null, names: { him: names.him, her: names.her }, createdAt: Date.now() + 1000
+      };
+
+      await addReceiptToCloud(rolloverReceipt);
+    }
+
+    window.showToast('✅ Fatura Fechada com Sucesso!');
+    window.closeCycleModal();
+    window.populateCycleSelects();
+    
+    // Reseta o filtro para ver a Fatura Atual limpinha
+    document.getElementById('filter-cycle').value = 'current';
+    document.getElementById('report-cycle').value = 'current';
+    
     window.renderHistory();
     window.renderReport();
+
+  } catch (e) {
+    setSyncStatus('err');
+    window.showToast('❌ Erro no fechamento: ' + e.message);
+  } finally {
+    isSaving = false;
   }
-  isSaving = false;
 };
 
-// ── PAINEL PESSOAL ──
-window.renderPersonalDashboard = function() {
-  const owner = document.getElementById('personal-owner').value; 
-  const scopeName = `personal_${owner}`;
-  const names = getNames();
-  
-  let list = allReceipts.filter(r => r.scope === scopeName);
-  list.sort((a,b) => b.date.localeCompare(a.date));
 
-  let incomeCents = 0;
-  let expenseCents = 0;
-
-  list.forEach(r => {
-    if (r.type === 'income') incomeCents += r.amountCents;
-    else if (r.type === 'expense') expenseCents += r.amountCents;
-  });
-
-  const balanceCents = incomeCents - expenseCents;
-  const balanceColor = balanceCents >= 0 ? 'var(--both)' : 'var(--her)';
-
-  const historyHTML = list.length === 0 
-    ? `<div class="empty"><p>Nenhum lançamento no seu painel pessoal.</p></div>` 
-    : list.map(r => {
-        const dStr = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-        const isInc = r.type === 'income';
-        const color = isInc ? 'var(--both)' : 'var(--her)';
-        const sign = isInc ? '+' : '-';
-        return `
-          <div class="store-row" style="border-bottom: 1px solid var(--border); padding: 0.75rem 0;">
-            <div style="flex:1;">
-              <div style="font-weight:700; font-size:0.85rem;">${r.store}</div>
-              <div style="font-size:0.7rem; color:var(--muted2);">${dStr}</div>
-            </div>
-            <div style="text-align:right;">
-              <div style="color:${color}; font-weight:800;">${sign} ${fmt(fromCents(r.amountCents))}</div>
-              <button class="btn-ghost" style="border:none; padding:0.2rem; font-size:0.7rem; color:var(--muted);" onclick="window.deleteReceipt('${r._fireId}')">Apagar</button>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-  const html = `
-    <div class="card" style="margin-bottom:1.5rem">
-      <div class="card-header">➕ Novo Lançamento Pessoal</div>
-      <div style="padding:1.25rem">
-        <div class="meta-grid">
-          <div>
-            <label class="field-label">Tipo</label>
-            <select class="field-input" id="pers-type">
-              <option value="expense">📉 Saída / Despesa</option>
-              <option value="income">📈 Entrada / Dinheiro</option>
-            </select>
-          </div>
-          <div>
-            <label class="field-label">Valor (R$)</label>
-            <input class="field-input" type="number" step="0.01" min="0" id="pers-price" placeholder="0,00">
-          </div>
-          <div style="grid-column: span 2;">
-            <label class="field-label">Descrição</label>
-            <input class="field-input" id="pers-desc" placeholder="Ex: Salário, Fatura Nubank, Ifood Sozinho...">
-          </div>
-        </div>
-        <button class="btn btn-primary" style="width:100%; margin-top:0.75rem;" onclick="window.savePersonalTransaction()">💾 Salvar no Pessoal</button>
-      </div>
-    </div>
-
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-label">Minhas Entradas</div>
-        <div class="stat-value" style="color:var(--both)">${fmt(fromCents(incomeCents))}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Minhas Saídas</div>
-        <div class="stat-value" style="color:var(--her)">${fmt(fromCents(expenseCents))}</div>
-      </div>
-      <div class="stat-card" style="grid-column: span 2;">
-        <div class="stat-label">Saldo em Conta / Sobra</div>
-        <div class="stat-value" style="color:${balanceColor}">${fmt(fromCents(balanceCents))}</div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:1.5rem;">
-      <div class="card-header">📋 Meu Histórico</div>
-      <div style="padding:0 1.25rem 0.5rem 1.25rem;">
-        ${historyHTML}
-      </div>
-    </div>
-  `;
-  document.getElementById('personal-dashboard-content').innerHTML = html;
-};
-
-window.savePersonalTransaction = async function() {
-  if (isSaving) return;
-  const owner = document.getElementById('personal-owner').value;
-  const type = document.getElementById('pers-type').value;
-  const price = document.getElementById('pers-price').value;
-  const desc = document.getElementById('pers-desc').value.trim();
-
-  if (!desc || !price || price <= 0) { window.showToast('⚠️ Preencha o valor e a descrição!'); return; }
-
-  isSaving = true;
-  const amountCents = cents(price);
-  const names = getNames();
-
-  const receipt = {
-    id: Date.now(), scope: `personal_${owner}`, type: type,
-    store: desc, date: today(), amountCents: amountCents,
-    names: { him: names.him, her: names.her }, createdAt: Date.now()
-  };
-
-  const ok = await addReceiptToCloud(receipt);
-  if (ok) {
-    window.showToast('✅ Lançamento pessoal salvo!');
-    window.renderPersonalDashboard();
-  }
-  isSaving = false;
-};
-
-// ── MODAL DE EDIÇÃO NORMAL ──
+// ── MODAL DE EDIÇÃO ──
 window.openEditModal = function(fireId) {
   const receipt = allReceipts.find(r => r._fireId === fireId);
   if (!receipt) return;
@@ -547,6 +492,7 @@ window.saveQuickExpense = async function() {
     const names = getNames();
     const receipt = {
       id: Date.now(), store: 'Lançamento Avulso', date: today(), payer, method: 'Avulso', category, status: 'open',
+      cycle: 'current', // Fica atrelado à fatura aberta
       items: [item], himCents: himC, herCents: herC, otherCents: otherC, coupleCents: himC + herC, totalCents: himC + herC + otherC,
       imageBase64: null, imageMime: null, names: { him: names.him, her: names.her }, createdAt: Date.now()
     };
@@ -560,7 +506,7 @@ window.saveQuickExpense = async function() {
       document.getElementById('quick-other-div').style.display = 'none';
       document.getElementById('quick-split').value = 'both';
       document.getElementById('quick-category').value = 'outros';
-      window.populateMonthSelects();
+      window.populateCycleSelects();
       window.renderHistory();
     }
   } catch (error) {} finally { isSaving = false; }
@@ -574,14 +520,14 @@ window.saveGoal = function() { appSettings.monthlyGoal = cents(document.getEleme
 window.changePassword = function() { const np = document.getElementById('new-password').value.trim(); if (!np) return; appSettings.password = np; saveSettingsToCloud(); document.getElementById('new-password').value = ''; window.showToast('✅ Senha alterada!'); };
 
 window.clearAllData = async function() {
-  if (!confirm('Apagar TODOS os dados (incluindo painel pessoal)?')) return;
+  if (!confirm('Apagar TODOS os dados (incluindo painel pessoal e faturas antigas)?')) return;
   setSyncStatus('syncing');
   try {
     const snap = await getDocs(collection(db, 'receipts'));
     await Promise.all(snap.docs.map(d => deleteDoc(doc(db, 'receipts', d.id))));
     allReceipts = [];
     setSyncStatus('ok');
-    window.populateMonthSelects();
+    window.populateCycleSelects();
     window.renderHistory();
     window.renderReport();
     if (document.getElementById('page-personal').classList.contains('active')) window.renderPersonalDashboard();
@@ -708,15 +654,83 @@ window.saveReceipt = async function() {
   const receipt = {
     id: Date.now(), store: document.getElementById('meta-store').value.trim() || 'Sem nome', date: document.getElementById('meta-date').value || today(),
     payer: document.getElementById('meta-payer').value || 'him', method: document.getElementById('meta-method').value.trim(), category: document.getElementById('meta-category').value || 'outros', status: 'open',
+    cycle: 'current', // Fica na fatura atual!
     items: currentProducts.map(p => ({ ...p })), himCents: himC, herCents: herC, otherCents: otherC, coupleCents: himC + herC, totalCents: himC + herC + otherC,
     imageBase64: currentBase64, imageMime: currentMime, names: { him: names.him, her: names.her }, createdAt: Date.now()
   };
   const ok = await addReceiptToCloud(receipt);
-  if (ok) { window.resetUpload(); window.populateMonthSelects(); window.renderHistory(); window.showToast('✅ Cupom salvo!'); }
+  if (ok) { window.resetUpload(); window.populateCycleSelects(); window.renderHistory(); window.showToast('✅ Cupom salvo!'); }
   isSaving = false;
 };
 
-// ── RENDERIZAÇÃO DE INTERFACES E GRÁFICOS ──
+// ── PAINEL PESSOAL ──
+window.renderPersonalDashboard = function() {
+  const owner = document.getElementById('personal-owner').value;
+  const scopeName = `personal_${owner}`;
+  const names = getNames();
+  
+  let list = allReceipts.filter(r => r.scope === scopeName);
+  list.sort((a,b) => b.date.localeCompare(a.date));
+
+  let incomeCents = 0; let expenseCents = 0;
+  list.forEach(r => { if (r.type === 'income') incomeCents += r.amountCents; else if (r.type === 'expense') expenseCents += r.amountCents; });
+
+  const balanceCents = incomeCents - expenseCents;
+  const balanceColor = balanceCents >= 0 ? 'var(--both)' : 'var(--her)';
+
+  const historyHTML = list.length === 0 ? `<div class="empty"><p>Nenhum lançamento pessoal.</p></div>` : list.map(r => {
+    const dStr = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+    const isInc = r.type === 'income'; const color = isInc ? 'var(--both)' : 'var(--her)'; const sign = isInc ? '+' : '-';
+    return `<div class="store-row" style="border-bottom: 1px solid var(--border); padding: 0.75rem 0;">
+      <div style="flex:1;"><div style="font-weight:700; font-size:0.85rem;">${r.store}</div><div style="font-size:0.7rem; color:var(--muted2);">${dStr}</div></div>
+      <div style="text-align:right;">
+        <div style="color:${color}; font-weight:800;">${sign} ${fmt(fromCents(r.amountCents))}</div>
+        <button class="btn-ghost" style="border:none; padding:0.2rem; font-size:0.7rem; color:var(--muted);" onclick="window.deleteReceipt('${r._fireId}')">Apagar</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('personal-dashboard-content').innerHTML = `
+    <div class="card" style="margin-bottom:1.5rem"><div class="card-header">➕ Novo Lançamento Pessoal</div>
+      <div style="padding:1.25rem"><div class="meta-grid">
+          <div><label class="field-label">Tipo</label><select class="field-input" id="pers-type"><option value="expense">📉 Saída / Despesa</option><option value="income">📈 Entrada</option></select></div>
+          <div><label class="field-label">Valor (R$)</label><input class="field-input" type="number" step="0.01" min="0" id="pers-price" placeholder="0,00"></div>
+          <div style="grid-column: span 2;"><label class="field-label">Descrição</label><input class="field-input" id="pers-desc" placeholder="Ex: Salário, Fatura Nubank..."></div>
+        </div><button class="btn btn-primary" style="width:100%; margin-top:0.75rem;" onclick="window.savePersonalTransaction()">💾 Salvar no Pessoal</button></div></div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Minhas Entradas</div><div class="stat-value" style="color:var(--both)">${fmt(fromCents(incomeCents))}</div></div>
+      <div class="stat-card"><div class="stat-label">Minhas Saídas</div><div class="stat-value" style="color:var(--her)">${fmt(fromCents(expenseCents))}</div></div>
+      <div class="stat-card" style="grid-column: span 2;"><div class="stat-label">Saldo em Conta / Sobra</div><div class="stat-value" style="color:${balanceColor}">${fmt(fromCents(balanceCents))}</div></div>
+    </div>
+    <div class="card" style="margin-top:1.5rem;"><div class="card-header">📋 Meu Histórico</div><div style="padding:0 1.25rem 0.5rem 1.25rem;">${historyHTML}</div></div>
+  `;
+};
+
+window.savePersonalTransaction = async function() {
+  if (isSaving) return;
+  const owner = document.getElementById('personal-owner').value;
+  const type = document.getElementById('pers-type').value;
+  const price = document.getElementById('pers-price').value;
+  const desc = document.getElementById('pers-desc').value.trim();
+
+  if (!desc || !price || price <= 0) { window.showToast('⚠️ Preencha o valor e a descrição!'); return; }
+
+  isSaving = true;
+  const amountCents = cents(price);
+  const names = getNames();
+
+  const receipt = {
+    id: Date.now(), scope: `personal_${owner}`, type: type,
+    store: desc, date: today(), amountCents: amountCents,
+    names: { him: names.him, her: names.her }, createdAt: Date.now()
+  };
+
+  const ok = await addReceiptToCloud(receipt);
+  if (ok) { window.showToast('✅ Salvo!'); window.renderPersonalDashboard(); }
+  isSaving = false;
+};
+
+// ── RENDERIZAÇÃO DE HISTÓRICO E RELATÓRIO (Com filtro de Ciclo) ──
 function buildDonutSVG(segments) {
   const total = segments.reduce((s, seg) => s + seg.value, 0); if (total === 0) return '';
   const r = 52, cx = 60, cy = 60, stroke = 16; const circ = 2 * Math.PI * r; let offset = 0, paths = '';
@@ -728,16 +742,17 @@ function buildDonutSVG(segments) {
   return `<svg class="donut-svg" viewBox="0 0 120 120" width="120" height="120"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--card2)" stroke-width="${stroke}"/>${paths}</svg>`;
 }
 
-window.populateMonthSelects = function() {
+// ── PREENCHER DROPDOWNS COM NOMES DAS FATURAS ──
+window.populateCycleSelects = function() {
   try {
-    const list = allReceipts.filter(r => !r.scope);
-    const months = [...new Set(list.map(r => r.date.slice(0, 7)))].sort().reverse();
-    ['filter-month', 'report-month'].forEach(sid => {
+    const list = allReceipts.filter(r => !r.scope && r.cycle && r.cycle !== 'current');
+    const cycles = [...new Set(list.map(r => r.cycle))]; // Pega os nomes das faturas passadas
+    ['filter-cycle', 'report-cycle'].forEach(sid => {
       const sel = document.getElementById(sid); if (!sel) return;
+      // Mantém a primeira opção intocada ("Fatura Atual")
       const first = sel.options[0].cloneNode(true); sel.innerHTML = ''; sel.appendChild(first);
-      months.forEach(m => {
-        const [y, mo] = m.split('-'); const label = new Date(y, mo - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-        const opt = document.createElement('option'); opt.value = m; opt.textContent = label.charAt(0).toUpperCase() + label.slice(1); sel.appendChild(opt);
+      cycles.forEach(c => {
+        const opt = document.createElement('option'); opt.value = c; opt.textContent = "📁 " + c; sel.appendChild(opt);
       });
     });
   } catch(e) {}
@@ -745,15 +760,20 @@ window.populateMonthSelects = function() {
 
 window.renderHistory = function() {
   try {
-    const month = document.getElementById('filter-month')?.value || '';
+    // Agora o filtro olha para o ciclo/fatura, não só para a string da data.
+    const cycle = document.getElementById('filter-cycle')?.value || 'current';
     const person = document.getElementById('filter-person')?.value || '';
     const category = document.getElementById('filter-category')?.value || '';
     
-    // Filtra para mostrar apenas lançamentos do casal
+    // Pega só contas do casal e atreladas à fatura correta
     let list = allReceipts.filter(r => !r.scope);
     
-    // AGORA o filtro de mês filtra TUDO (Gastos e Acertos/Pix)
-    if (month) list = list.filter(r => r.date.startsWith(month));
+    if (cycle === 'current') {
+       list = list.filter(r => !r.cycle || r.cycle === 'current');
+    } else {
+       list = list.filter(r => r.cycle === cycle);
+    }
+    
     if (person === 'him') list = list.filter(r => r.type === 'settlement' ? r.payer === 'him' : r.himCents > 0);
     if (person === 'her') list = list.filter(r => r.type === 'settlement' ? r.payer === 'her' : r.herCents > 0);
     if (category) list = list.filter(r => r.type !== 'settlement' && (r.category || 'outros') === category);
@@ -761,7 +781,7 @@ window.renderHistory = function() {
 
     const container = document.getElementById('history-list');
     if (!list.length) {
-      container.innerHTML = `<div class="empty"><div class="empty-icon">🧾</div><p>Nenhum lançamento encontrado.</p></div>`;
+      container.innerHTML = `<div class="empty"><div class="empty-icon">🧾</div><p>Nenhum lançamento nesta fatura.</p></div>`;
       return;
     }
 
@@ -770,7 +790,7 @@ window.renderHistory = function() {
       const dateStr = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
       const fid = r._fireId;
 
-      // ── CARD DE ACERTO (PIX) ──
+      // ── CARD DE ACERTO (PIX) DENTRO DO HISTÓRICO ──
       if (r.type === 'settlement') {
         const payerName = r.payer === 'him' ? names.him : names.her;
         const color = r.payer === 'him' ? 'var(--him)' : 'var(--her)';
@@ -783,12 +803,12 @@ window.renderHistory = function() {
             <div style="font-weight:900; font-size:1.1rem; color:${color};">${fmt(fromCents(r.amountCents))}</div>
           </div>
           <div style="padding: 0 1.25rem 1rem 1.25rem; text-align:right;">
-             <button class="btn-ghost" style="border:none; padding:0.2rem; font-size:0.75rem; color:var(--muted);" onclick="window.deleteReceipt('${fid}')">🗑️ Desfazer Pix</button>
+             <button class="btn-ghost" style="border:none; padding:0.2rem; font-size:0.75rem; color:var(--muted);" onclick="window.deleteReceipt('${fid}')">🗑️ Apagar Pix</button>
           </div>
         </div>`;
       }
 
-      // ── CARD DE GASTO NORMAL (EXPANSÍVEL) ──
+      // ── CARD NORMAL (EXPANSÍVEL) ──
       const himC = r.himCents || 0; const herC = r.herCents || 0; const otherC = r.otherCents || 0;
       const isPaid = r.status === 'paid';
       const payerName = r.payer === 'him' ? names.him : (r.payer === 'her' ? names.her : '');
@@ -848,13 +868,15 @@ window.toggleCard = function(id) {
 
 window.renderReport = function() {
   try {
-    const month = document.getElementById('report-month')?.value || '';
+    const cycle = document.getElementById('report-cycle')?.value || 'current';
     
-    // Pega APENAS as contas do casal, sem o painel pessoal
+    // Pega APENAS as contas do casal, sem o painel pessoal, pertencentes à fatura selecionada
     let list = allReceipts.filter(r => !r.scope);
-    
-    // O FILTRO DE MÊS AGORA AFETA TUDO (Inclusive a Dívida Acumulada/Acerto)
-    if (month) list = list.filter(r => r.date.startsWith(month));
+    if (cycle === 'current') {
+       list = list.filter(r => !r.cycle || r.cycle === 'current');
+    } else {
+       list = list.filter(r => r.cycle === cycle);
+    }
 
     const container = document.getElementById('report-content');
     const names = getNames();
@@ -873,7 +895,6 @@ window.renderReport = function() {
         const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
         const rOtherC = r.otherCents !== undefined ? r.otherCents : cents(r.otherTotal || 0);
         
-        // ESTATÍSTICAS
         himC += rHimC; herC += rHerC; otherC += rOtherC;
         if (!storeMap[r.store]) storeMap[r.store] = { himC: 0, herC: 0 };
         storeMap[r.store].himC += rHimC; storeMap[r.store].herC += rHerC;
@@ -881,7 +902,6 @@ window.renderReport = function() {
         if (!categoryMap[cat]) categoryMap[cat] = 0;
         categoryMap[cat] += rHimC + rHerC + rOtherC;
 
-        // ACERTO DE CONTAS (SÓ CONTA SE ESTIVER EM ABERTO)
         if (r.status !== 'paid') {
           if (r.payer === 'him') {
             runningBalanceCents += rHerC; 
@@ -903,30 +923,29 @@ window.renderReport = function() {
     let settlementHTML = '';
     if (runningBalanceCents > 0) {
       settlementHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--both)">
-        <div class="card-header" style="color:var(--both)">🤝 Acerto do Mês Selecionado</div>
+        <div class="card-header" style="color:var(--both)">🤝 Acerto (Nesta Fatura)</div>
         <div style="padding:1.25rem;text-align:center">
           <div style="font-size:0.85rem;color:var(--muted2);margin-bottom:0.4rem">${names.her} deve pagar para ${names.him}</div>
           <div style="font-size:2rem;font-weight:900;color:var(--both);letter-spacing:-1px">${fmt(fromCents(runningBalanceCents))}</div>
         </div></div>`;
     } else if (runningBalanceCents < 0) {
       settlementHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--her)">
-        <div class="card-header" style="color:var(--her)">🤝 Acerto do Mês Selecionado</div>
+        <div class="card-header" style="color:var(--her)">🤝 Acerto (Nesta Fatura)</div>
         <div style="padding:1.25rem;text-align:center">
           <div style="font-size:0.85rem;color:var(--muted2);margin-bottom:0.4rem">${names.him} deve pagar para ${names.her}</div>
           <div style="font-size:2rem;font-weight:900;color:var(--her);letter-spacing:-1px">${fmt(fromCents(Math.abs(runningBalanceCents)))}</div>
         </div></div>`;
     } else {
       settlementHTML = `<div class="card" style="margin-bottom:1rem">
-        <div class="card-header">🤝 Acerto do Mês Selecionado</div>
-        <div style="padding:1.25rem;text-align:center;font-weight:700;color:var(--both)">Tudo quite neste mês! ✅</div>
+        <div class="card-header">🤝 Acerto (Nesta Fatura)</div>
+        <div style="padding:1.25rem;text-align:center;font-weight:700;color:var(--both)">Tudo quite nesta fatura! ✅</div>
       </div>`;
     }
 
-    // Retira os settlements (Pix) da lista abaixo, para mostrar apenas os gastos
     let listGastos = list.filter(r => r.type !== 'settlement');
 
     if (!listGastos.length && runningBalanceCents === 0) {
-      container.innerHTML = `<div class="empty"><div class="empty-icon">📊</div><p>Nenhum gasto ou acerto registrado ${month ? 'neste mês' : '— selecione um mês'}.</p></div>`;
+      container.innerHTML = `${settlementHTML}<div class="empty"><div class="empty-icon">📊</div><p>Nenhum dado nesta fatura.</p></div>`;
       return;
     }
 
@@ -936,31 +955,31 @@ window.renderReport = function() {
     let thirdPartyHTML = ''; let hasDebts = false; let debtsRows = '';
     Object.entries(thirdPartyDebts.him).forEach(([name, amount]) => { hasDebts = true; debtsRows += `<div class="store-row"><span>${name} <small style="color:var(--muted2)">(deve a ${names.him})</small></span><span style="color:var(--him);font-weight:800">${fmt(fromCents(amount))}</span></div>`; });
     Object.entries(thirdPartyDebts.her).forEach(([name, amount]) => { hasDebts = true; debtsRows += `<div class="store-row"><span>${name} <small style="color:var(--muted2)">(deve a ${names.her})</small></span><span style="color:var(--her);font-weight:800">${fmt(fromCents(amount))}</span></div>`; });
-    if (hasDebts) { thirdPartyHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--other)"><div class="card-header" style="color:var(--other)">👥 A Receber de Terceiros (Em Aberto no mês)</div><div style="padding:0 1.25rem">${debtsRows}</div></div>`; }
+    if (hasDebts) { thirdPartyHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--other)"><div class="card-header" style="color:var(--other)">👥 A Receber de Terceiros (Em Aberto)</div><div style="padding:0 1.25rem">${debtsRows}</div></div>`; }
 
     let goalHTML = '';
     if (appSettings.monthlyGoal > 0) {
       const pct = Math.min(100, Math.round(coupleC / appSettings.monthlyGoal * 100));
       const color = pct >= 100 ? 'var(--her)' : pct >= 80 ? 'var(--other)' : 'var(--both)';
-      goalHTML = `<div class="card" style="margin-bottom:1rem"><div class="card-header">🎯 Meta Mensal do Casal</div><div class="goal-bar-wrap"><div class="goal-bar-labels"><span>${fmt(fromCents(coupleC))} gastos</span><span style="color:${color};font-weight:800">${pct}%</span></div><div class="goal-bar-track"><div class="goal-bar-fill" style="width:${pct}%;background:${color}"></div></div><div style="font-size:0.72rem;color:var(--muted2);margin-top:0.4rem">Meta: ${fmt(fromCents(appSettings.monthlyGoal))}</div></div></div>`;
+      goalHTML = `<div class="card" style="margin-bottom:1rem"><div class="card-header">🎯 Meta da Fatura</div><div class="goal-bar-wrap"><div class="goal-bar-labels"><span>${fmt(fromCents(coupleC))} gastos</span><span style="color:${color};font-weight:800">${pct}%</span></div><div class="goal-bar-track"><div class="goal-bar-fill" style="width:${pct}%;background:${color}"></div></div><div style="font-size:0.72rem;color:var(--muted2);margin-top:0.4rem">Meta: ${fmt(fromCents(appSettings.monthlyGoal))}</div></div></div>`;
     }
 
     const statsHTML = `<div class="stat-grid" style="margin-bottom:1rem">
-      <div class="stat-card"><div class="stat-label">${names.him} consumiu no mês</div><div class="stat-value" style="color:var(--him)">${fmt(fromCents(himC))}</div></div>
-      <div class="stat-card"><div class="stat-label">${names.her} consumiu no mês</div><div class="stat-value" style="color:var(--her)">${fmt(fromCents(herC))}</div></div>
-      <div class="stat-card"><div class="stat-label">Total do casal (Mês)</div><div class="stat-value" style="color:var(--both)">${fmt(fromCents(coupleC))}</div></div>
-      ${otherC > 0 ? `<div class="stat-card"><div class="stat-label">Terceiros no mês</div><div class="stat-value" style="color:var(--other)">${fmt(fromCents(otherC))}</div></div>` : `<div class="stat-card"><div class="stat-label">Contas no mês</div><div class="stat-value">${listGastos.length}</div></div>`}
+      <div class="stat-card"><div class="stat-label">${names.him} consumiu</div><div class="stat-value" style="color:var(--him)">${fmt(fromCents(himC))}</div></div>
+      <div class="stat-card"><div class="stat-label">${names.her} consumiu</div><div class="stat-value" style="color:var(--her)">${fmt(fromCents(herC))}</div></div>
+      <div class="stat-card"><div class="stat-label">Total do casal</div><div class="stat-value" style="color:var(--both)">${fmt(fromCents(coupleC))}</div></div>
+      ${otherC > 0 ? `<div class="stat-card"><div class="stat-label">Terceiros</div><div class="stat-value" style="color:var(--other)">${fmt(fromCents(otherC))}</div></div>` : `<div class="stat-card"><div class="stat-label">Contas</div><div class="stat-value">${listGastos.length}</div></div>`}
     </div>`;
 
     const donutSegs = [ { value: himC, color: 'var(--him)', label: names.him, val: fmt(fromCents(himC)) }, { value: herC, color: 'var(--her)', label: names.her, val: fmt(fromCents(herC)) } ];
     if (otherC > 0) donutSegs.push({ value: otherC, color: 'var(--other)', label: 'Terceiros', val: fmt(fromCents(otherC)) });
-    const donutHTML = `<div class="card" style="margin-bottom:1rem"><div class="card-header">🍩 Proporção de gastos do mês</div><div class="donut-wrap">${buildDonutSVG(donutSegs)}<div class="donut-legend">${donutSegs.map(s => `<div class="donut-legend-item"><div class="donut-legend-dot" style="background:${s.color}"></div><span class="donut-legend-label">${s.label}</span><span class="donut-legend-value" style="color:${s.color}">${s.val}</span></div>`).join('')}<div class="donut-legend-item" style="margin-top:0.25rem;padding-top:0.5rem;border-top:1px solid var(--border)"><span class="donut-legend-label">Proporção</span><span class="donut-legend-value" style="color:var(--muted2)">${himPct}% / ${herPct}%</span></div></div></div></div>`;
+    const donutHTML = `<div class="card" style="margin-bottom:1rem"><div class="card-header">🍩 Proporção de gastos</div><div class="donut-wrap">${buildDonutSVG(donutSegs)}<div class="donut-legend">${donutSegs.map(s => `<div class="donut-legend-item"><div class="donut-legend-dot" style="background:${s.color}"></div><span class="donut-legend-label">${s.label}</span><span class="donut-legend-value" style="color:${s.color}">${s.val}</span></div>`).join('')}<div class="donut-legend-item" style="margin-top:0.25rem;padding-top:0.5rem;border-top:1px solid var(--border)"><span class="donut-legend-label">Proporção</span><span class="donut-legend-value" style="color:var(--muted2)">${himPct}% / ${herPct}%</span></div></div></div></div>`;
 
     const catRows = Object.entries(categoryMap).sort((a, b) => b[1] - a[1]).map(([cat, val]) => {
       const pctBar = grandC > 0 ? Math.round(val / grandC * 100) : 0;
       return `<div class="cat-row"><span style="min-width:100px;font-size:0.82rem;font-weight:600">${catLabel(cat)}</span><div class="cat-row-bar"><div class="cat-row-fill" style="width:${pctBar}%"></div></div><span class="cat-row-value">${fmt(fromCents(val))}</span></div>`;
     }).join('');
-    const categoryHTML = grandC > 0 ? `<div class="card" style="margin-bottom:1rem"><div class="card-header">📂 Gastos por categoria (Mês)</div><div style="padding:0.5rem 1.25rem">${catRows}</div></div>` : '';
+    const categoryHTML = grandC > 0 ? `<div class="card" style="margin-bottom:1rem"><div class="card-header">📂 Gastos por categoria</div><div style="padding:0.5rem 1.25rem">${catRows}</div></div>` : '';
 
     const storeRows = Object.entries(storeMap).sort((a, b) => (b[1].himC + b[1].herC) - (a[1].himC + a[1].herC)).slice(0, 8).map(([store, v]) => `<div class="store-row"><span class="store-name">${store}</span><div class="store-amounts"><span style="color:var(--him)">${fmt(fromCents(v.himC))}</span><span style="color:var(--her)">${fmt(fromCents(v.herC))}</span></div></div>`).join('');
     const receiptRows = [...listGastos].sort((a, b) => b.date.localeCompare(a.date)).map(r => {
@@ -969,7 +988,7 @@ window.renderReport = function() {
       return `<div class="store-row" style="${r.status === 'paid' ? 'opacity:0.6' : ''}"><span>${d} — ${r.store} <span class="category-badge">${catLabel(r.category || 'outros')}</span></span><div class="store-amounts"><span style="color:var(--him)">${fmt(fromCents(rHimC))}</span><span style="color:var(--her)">${fmt(fromCents(rHerC))}</span></div></div>`;
     }).join('');
 
-    const exportBtn = `<div style="margin-bottom:1rem;display:flex;justify-content:flex-end"><button class="btn btn-ghost btn-sm" onclick="window.exportCSV()">📥 Exportar CSV Mensal</button></div>`;
+    const exportBtn = `<div style="margin-bottom:1rem;display:flex;justify-content:flex-end"><button class="btn btn-ghost btn-sm" onclick="window.exportCSV()">📥 Exportar CSV desta Fatura</button></div>`;
 
     container.innerHTML = `
       ${settlementHTML}
@@ -978,8 +997,8 @@ window.renderReport = function() {
       ${statsHTML}
       ${donutHTML}
       ${categoryHTML}
-      <div class="card" style="margin-bottom:1rem"><div class="card-header">🏪 Onde vocês mais gastaram (Mês)</div><div style="padding:0 1.25rem">${storeRows}</div></div>
-      <div class="card" style="margin-bottom:1rem"><div class="card-header">🧾 ${listGastos.length} contas no mês</div><div style="padding:0 1.25rem">${receiptRows}</div></div>
+      <div class="card" style="margin-bottom:1rem"><div class="card-header">🏪 Onde vocês mais gastaram</div><div style="padding:0 1.25rem">${storeRows}</div></div>
+      <div class="card" style="margin-bottom:1rem"><div class="card-header">🧾 ${listGastos.length} contas na fatura</div><div style="padding:0 1.25rem">${receiptRows}</div></div>
       ${exportBtn}
     `;
   } catch (error) {}
@@ -988,10 +1007,11 @@ window.renderReport = function() {
 // ── EXPORTAR CSV ──
 window.exportCSV = function() {
   try {
-    const month = document.getElementById('report-month')?.value || '';
-    // Exporta só as contas reais (ignora Painel Pessoal e Acertos de Pix)
+    const cycle = document.getElementById('report-cycle')?.value || 'current';
     let list = allReceipts.filter(r => !r.scope && r.type !== 'settlement');
-    if (month) list = list.filter(r => r.date.startsWith(month));
+    if (cycle === 'current') list = list.filter(r => !r.cycle || r.cycle === 'current');
+    else list = list.filter(r => r.cycle === cycle);
+
     if (!list.length) { window.showToast('⚠️ Nenhum dado para exportar.'); return; }
 
     const names = getNames();
@@ -1008,7 +1028,7 @@ window.exportCSV = function() {
     const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob); const a = document.createElement('a');
-    a.href = url; a.download = `gastos_casal_${month || 'todos'}.csv`; a.click(); URL.revokeObjectURL(url);
+    a.href = url; a.download = `gastos_casal_${cycle}.csv`; a.click(); URL.revokeObjectURL(url);
     window.showToast('📥 CSV exportado!');
   } catch(e) {}
 };

@@ -46,11 +46,11 @@
     <div style="display:flex;align-items:center;gap:0.75rem">
       <div class="sync-dot" id="sync-dot" title="Status da sincronização"></div>
       <nav class="desktop-nav">
-        <button class="desktop-nav-btn active" onclick="window.showPage('add',this)">＋ Gastos</button>
-        <button class="desktop-nav-btn" onclick="window.showPage('history',this)">Histórico</button>
-        <button class="desktop-nav-btn" onclick="window.showPage('report',this)">Relatório</button>
-        <button class="desktop-nav-btn" onclick="window.showPage('personal',this)">Pessoal</button>
-        <button class="desktop-nav-btn" onclick="window.showPage('settings',this)">Config</button>
+        <button class="desktop-nav-btn active" onclick="window.showPage('add',this,'nav-add')">＋ Gastos</button>
+        <button class="desktop-nav-btn" onclick="window.showPage('history',this,'nav-history')">Histórico</button>
+        <button class="desktop-nav-btn" onclick="window.showPage('report',this,'nav-report')">Relatório</button>
+        <button class="desktop-nav-btn" onclick="window.showPage('personal',this,'nav-personal')">Pessoal</button>
+        <button class="desktop-nav-btn" onclick="window.showPage('settings',this,'nav-settings')">Config</button>
       </nav>
     </div>
   </header>
@@ -186,9 +186,7 @@
             <button class="btn btn-primary btn-sm" onclick="window.addManual()">+</button>
           </div>
         </div>
-
         <div class="summary-row" id="summary-row"></div>
-
         <div class="btn-row">
           <button class="btn btn-success" onclick="window.saveReceipt()">💾 Salvar Cupom</button>
           <button class="btn btn-ghost" onclick="window.resetAll()">✕ Descartar</button>
@@ -199,10 +197,10 @@
 
   <div id="page-history" class="page">
     <div class="page-title">Histórico</div>
-    <div class="page-sub">Todos os cupons e lançamentos na nuvem.</div>
+    <div class="page-sub">Visualize as faturas fechadas ou os lançamentos atuais.</div>
     <div class="filter-bar">
-      <select class="filter-select" id="filter-month" onchange="window.renderHistory()">
-        <option value="">Todos os meses</option>
+      <select class="filter-select" id="filter-cycle" onchange="window.renderHistory()">
+        <option value="current">🧾 Fatura Atual (Aberta)</option>
       </select>
       <select class="filter-select" id="filter-person" onchange="window.renderHistory()">
         <option value="">Todos</option>
@@ -227,13 +225,13 @@
 
   <div id="page-report" class="page">
     <div class="page-title">Relatório</div>
-    <div class="page-sub">Resumo mensal e acerto de contas.</div>
+    <div class="page-sub">Fechamento do Mês e Acerto de Contas.</div>
     
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
-      <select class="report-month-sel" id="report-month" onchange="window.renderReport()" style="margin-bottom:0; width:auto; flex:1; margin-right:0.5rem;">
-        <option value="">Selecione o mês</option>
+      <select class="report-month-sel" id="report-cycle" onchange="window.renderReport()" style="margin-bottom:0; width:auto; flex:1; margin-right:0.5rem;">
+        <option value="current">🧾 Fatura Atual (Aberta)</option>
       </select>
-      <button class="btn btn-success btn-sm" onclick="window.openSettleModal()">💸 Fazer Acerto</button>
+      <button class="btn btn-success btn-sm" onclick="window.openCloseCycleModal()">🔒 Fechar Fatura</button>
     </div>
     
     <div id="report-content"></div>
@@ -379,34 +377,38 @@
   </div>
 </div>
 
-<div id="settle-modal" class="modal-overlay" onclick="if(event.target===this)window.closeSettleModal()">
+<div id="close-cycle-modal" class="modal-overlay" onclick="if(event.target===this)window.closeCycleModal()">
   <div class="modal-box">
     <div class="modal-header">
-      <span>🤝 Abater Dívida (Acerto)</span>
-      <button class="modal-close" onclick="window.closeSettleModal()">✕</button>
+      <span>🔒 Fechar Fatura e Acertar Dívida</span>
+      <button class="modal-close" onclick="window.closeCycleModal()">✕</button>
     </div>
     <div class="modal-body">
       <p style="font-size: 0.85rem; color: var(--muted2); margin-bottom: 1rem;">
-        Registre aqui quando um pagar o outro (Ex: Pix para abater a conta do mês). Isso diminuirá a dívida pendente daquele mês.
+        Isso vai arquivar todas as contas da "Fatura Atual". Se o valor pago não zerar a dívida de vocês, o restante será automaticamente lançado na próxima fatura em aberto.
       </p>
       <div class="meta-grid">
         <div style="grid-column: span 2;">
-          <label class="field-label">Quem está enviando o dinheiro?</label>
-          <select class="field-input" id="settle-payer"></select>
+          <label class="field-label">Nome do Fechamento</label>
+          <input class="field-input" id="cycle-name" placeholder="Ex: Acerto de Abril 2026">
+        </div>
+        <div style="grid-column: span 2;">
+          <label class="field-label">Quem está pagando o outro hoje?</label>
+          <select class="field-input" id="cycle-payer"></select>
         </div>
         <div>
-          <label class="field-label">Valor (R$)</label>
-          <input class="field-input" type="number" step="0.01" min="0" id="settle-amount" placeholder="0,00">
+          <label class="field-label">Valor Pago no Pix (R$)</label>
+          <input class="field-input" type="number" step="0.01" min="0" id="cycle-amount" placeholder="0,00">
         </div>
         <div>
           <label class="field-label">Data</label>
-          <input class="field-input" type="date" id="settle-date">
+          <input class="field-input" type="date" id="cycle-date">
         </div>
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-ghost btn-sm" onclick="window.closeSettleModal()">Cancelar</button>
-      <button class="btn btn-success btn-sm" onclick="window.saveSettlement()">💸 Salvar Pagamento</button>
+      <button class="btn btn-ghost btn-sm" onclick="window.closeCycleModal()">Cancelar</button>
+      <button class="btn btn-success btn-sm" onclick="window.saveCloseCycle()">🔒 Finalizar Acerto</button>
     </div>
   </div>
 </div>
