@@ -758,7 +758,8 @@ window.renderHistory = function() {
     const month = document.getElementById('filter-month')?.value || '';
     const person = document.getElementById('filter-person')?.value || '';
     const category = document.getElementById('filter-category')?.value || '';
-    let list = allReceipts.filter(r => !r.scope);
+    
+    let list = allReceipts.filter(r => !r.scope); // Filtra o painel pessoal
     if (month) list = list.filter(r => r.date.startsWith(month));
     if (person === 'him') list = list.filter(r => r.type === 'settlement' ? r.payer === 'him' : r.himCents > 0);
     if (person === 'her') list = list.filter(r => r.type === 'settlement' ? r.payer === 'her' : r.herCents > 0);
@@ -766,36 +767,67 @@ window.renderHistory = function() {
     list.sort((a, b) => b.date.localeCompare(a.date));
 
     const container = document.getElementById('history-list');
-    container.innerHTML = list.length === 0 ? `<div class="empty"><p>Nenhum cupom encontrado.</p></div>` : list.map((r, idx) => {
+    if (!list.length) {
+      container.innerHTML = `<div class="empty"><div class="empty-icon">🧾</div><p>Nenhum cupom encontrado.</p></div>`;
+      return;
+    }
+
+    container.innerHTML = list.map((r, idx) => {
       const names = r.names || getNames();
-      const dateStr = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+      const dateStr = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
       const fid = r._fireId;
 
+      // ── CARD DE ACERTO (PIX) ──
       if (r.type === 'settlement') {
         const payerName = r.payer === 'him' ? names.him : names.her;
-        return `<div class="receipt-card"><div class="receipt-head" style="align-items:center;"><div><div class="receipt-store" style="color:var(--other)">${r.store}</div><div class="receipt-date">${dateStr} • Por ${payerName}</div></div><div style="font-weight:800;color:var(--other)">${fmt(fromCents(r.amountCents))}</div></div></div>`;
+        const color = r.payer === 'him' ? 'var(--him)' : 'var(--her)';
+        return `<div class="receipt-card" style="animation-delay:${idx * 0.04}s; border-color:${color};">
+          <div class="receipt-head" style="align-items:center;">
+            <div>
+              <div class="receipt-store" style="color:${color}">${r.store}</div>
+              <div class="receipt-date">${dateStr} • Por ${payerName}</div>
+            </div>
+            <div style="font-weight:900; font-size:1.1rem; color:${color};">${fmt(fromCents(r.amountCents))}</div>
+          </div>
+          <div style="padding: 0 1.25rem 1rem 1.25rem; text-align:right;">
+             <button class="btn-ghost" style="border:none; padding:0.2rem; font-size:0.75rem; color:var(--muted);" onclick="window.deleteReceipt('${fid}')">Desfazer Pix</button>
+          </div>
+        </div>`;
       }
 
+      // ── CARD DE GASTO NORMAL (O QUE VOCÊ QUERIA DE VOLTA) ──
       const himC = r.himCents || 0; const herC = r.herCents || 0; const otherC = r.otherCents || 0;
       const isPaid = r.status === 'paid';
+      const payerName = r.payer === 'him' ? names.him : (r.payer === 'her' ? names.her : '');
+      const methodStr = r.method ? ` (${r.method})` : '';
+      const cat = catLabel(r.category || 'outros');
+      const statusBadge = isPaid ? `<span class="item-badge badge-both">✅ PAGO</span>` : `<span class="item-badge badge-other">⏳ ABERTO</span>`;
+
       const itemRows = r.items.map(item => {
         const iC = item.priceCents || 0;
         const badgeLabel = item.split === 'him' ? names.him.split(' ')[0] : item.split === 'her' ? names.her.split(' ')[0] : item.split === 'other' ? (item.otherName || '?') : '÷2';
         return `<div class="receipt-item-row"><span style="flex:1">${item.name}</span><span class="item-badge">${badgeLabel}</span><span style="font-weight:700;color:var(--both)">${fmt(fromCents(iC))}</span></div>`;
       }).join('');
 
-      return `<div class="receipt-card" style="${isPaid ? 'opacity:0.7' : ''}">
+      const imgSrc = r.imageBase64 ? `data:${r.imageMime || 'image/jpeg'};base64,${r.imageBase64}` : '';
+
+      return `<div class="receipt-card" style="${isPaid ? 'opacity:0.72;' : ''}animation-delay:${idx * 0.04}s">
         <div class="receipt-head" onclick="window.toggleCard('${fid}')">
-          <div><div class="receipt-store">${r.store} ${isPaid ? '✅' : '⏳'}</div><div class="receipt-date">${dateStr}</div></div>
+          <div style="min-width:0">
+            <div class="receipt-store">${r.store} ${statusBadge}</div>
+            <div class="receipt-date">${dateStr} • Por ${payerName}${methodStr}</div>
+            <div style="margin-top:0.25rem"><span class="category-badge">${cat}</span></div>
+          </div>
           <div class="receipt-amounts">
-            <span style="color:var(--him)">${fmt(fromCents(himC))}</span>
-            <span style="color:var(--her)">${fmt(fromCents(herC))}</span>
+            <div class="receipt-amount-item"><div class="amount-dot" style="background:var(--him)"></div><span>${fmt(fromCents(himC))}</span></div>
+            <div class="receipt-amount-item"><div class="amount-dot" style="background:var(--her)"></div><span>${fmt(fromCents(herC))}</span></div>
           </div>
         </div>
         <div class="receipt-body" id="card-body-${fid}">
+          ${imgSrc ? `<div class="receipt-img-wrap"><img src="${imgSrc}" alt="Cupom"></div>` : ''}
           <div class="receipt-items">${itemRows}</div>
           <div class="receipt-actions">
-            <button class="btn ${isPaid ? 'btn-ghost' : 'btn-success'} btn-sm" onclick="window.toggleReceiptStatus('${fid}')">${isPaid ? '🔄 Reabrir' : '💸 Pagar'}</button>
+            <button class="btn ${isPaid ? 'btn-ghost' : 'btn-success'} btn-sm" onclick="window.toggleReceiptStatus('${fid}')">${isPaid ? '🔄 Reabrir' : '💸 Marcar Pago'}</button>
             <button class="btn btn-ghost btn-sm" onclick="window.openEditModal('${fid}')">✏️ Editar</button>
             <button class="btn btn-danger btn-sm" onclick="window.deleteReceipt('${fid}')">🗑️ Apagar</button>
           </div>
