@@ -759,7 +759,9 @@ window.renderHistory = function() {
     const person = document.getElementById('filter-person')?.value || '';
     const category = document.getElementById('filter-category')?.value || '';
     
-    let list = allReceipts.filter(r => !r.scope); // Filtra o painel pessoal
+    // Filtra para mostrar tudo (Gastos + Pix)
+    let list = [...allReceipts].filter(r => !r.scope);
+    
     if (month) list = list.filter(r => r.date.startsWith(month));
     if (person === 'him') list = list.filter(r => r.type === 'settlement' ? r.payer === 'him' : r.himCents > 0);
     if (person === 'her') list = list.filter(r => r.type === 'settlement' ? r.payer === 'her' : r.herCents > 0);
@@ -768,7 +770,7 @@ window.renderHistory = function() {
 
     const container = document.getElementById('history-list');
     if (!list.length) {
-      container.innerHTML = `<div class="empty"><div class="empty-icon">🧾</div><p>Nenhum cupom encontrado.</p></div>`;
+      container.innerHTML = `<div class="empty"><div class="empty-icon">🧾</div><p>Nenhum lançamento encontrado.</p></div>`;
       return;
     }
 
@@ -790,23 +792,27 @@ window.renderHistory = function() {
             <div style="font-weight:900; font-size:1.1rem; color:${color};">${fmt(fromCents(r.amountCents))}</div>
           </div>
           <div style="padding: 0 1.25rem 1rem 1.25rem; text-align:right;">
-             <button class="btn-ghost" style="border:none; padding:0.2rem; font-size:0.75rem; color:var(--muted);" onclick="window.deleteReceipt('${fid}')">Desfazer Pix</button>
+             <button class="btn-ghost" style="border:none; padding:0.2rem; font-size:0.75rem; color:var(--muted);" onclick="window.deleteReceipt('${fid}')">🗑️ Desfazer Pix</button>
           </div>
         </div>`;
       }
 
-      // ── CARD DE GASTO NORMAL (O QUE VOCÊ QUERIA DE VOLTA) ──
+      // ── CARD DE GASTO NORMAL (EXPANSÍVEL) ──
       const himC = r.himCents || 0; const herC = r.herCents || 0; const otherC = r.otherCents || 0;
       const isPaid = r.status === 'paid';
       const payerName = r.payer === 'him' ? names.him : (r.payer === 'her' ? names.her : '');
       const methodStr = r.method ? ` (${r.method})` : '';
       const cat = catLabel(r.category || 'outros');
-      const statusBadge = isPaid ? `<span class="item-badge badge-both">✅ PAGO</span>` : `<span class="item-badge badge-other">⏳ ABERTO</span>`;
+
+      const statusBadge = isPaid
+        ? `<span style="background:var(--both-bg);color:var(--both);padding:0.15rem 0.4rem;border-radius:10px;font-size:0.62rem;font-weight:800;margin-left:0.4rem;">✅ PAGO</span>`
+        : `<span style="background:var(--other-bg);color:var(--other);padding:0.15rem 0.4rem;border-radius:10px;font-size:0.62rem;font-weight:800;margin-left:0.4rem;">⏳ EM ABERTO</span>`;
 
       const itemRows = r.items.map(item => {
         const iC = item.priceCents || 0;
+        const badgeClass = item.split === 'him' ? 'badge-him' : item.split === 'her' ? 'badge-her' : item.split === 'other' ? 'badge-other' : 'badge-both';
         const badgeLabel = item.split === 'him' ? names.him.split(' ')[0] : item.split === 'her' ? names.her.split(' ')[0] : item.split === 'other' ? (item.otherName || '?') : '÷2';
-        return `<div class="receipt-item-row"><span style="flex:1">${item.name}</span><span class="item-badge">${badgeLabel}</span><span style="font-weight:700;color:var(--both)">${fmt(fromCents(iC))}</span></div>`;
+        return `<div class="receipt-item-row"><span style="flex:1">${item.name}</span><span class="item-badge ${badgeClass}">${badgeLabel}</span><span style="font-weight:700;color:var(--both)">${fmt(fromCents(iC))}</span></div>`;
       }).join('');
 
       const imgSrc = r.imageBase64 ? `data:${r.imageMime || 'image/jpeg'};base64,${r.imageBase64}` : '';
@@ -814,13 +820,19 @@ window.renderHistory = function() {
       return `<div class="receipt-card" style="${isPaid ? 'opacity:0.72;' : ''}animation-delay:${idx * 0.04}s">
         <div class="receipt-head" onclick="window.toggleCard('${fid}')">
           <div style="min-width:0">
-            <div class="receipt-store">${r.store} ${statusBadge}</div>
-            <div class="receipt-date">${dateStr} • Por ${payerName}${methodStr}</div>
-            <div style="margin-top:0.25rem"><span class="category-badge">${cat}</span></div>
+            <div class="receipt-store">${r.store}</div>
+            <div class="receipt-date" style="display:flex;align-items:center;flex-wrap:wrap;gap:0.2rem;margin-top:0.2rem">
+              ${dateStr} ${statusBadge}
+            </div>
+            <div style="margin-top:0.25rem">
+              <span class="category-badge">${cat}</span>
+              ${payerName ? `<span style="font-size:0.7rem;color:var(--muted2);margin-left:0.35rem">por <strong>${payerName}</strong>${methodStr}</span>` : ''}
+            </div>
           </div>
           <div class="receipt-amounts">
-            <div class="receipt-amount-item"><div class="amount-dot" style="background:var(--him)"></div><span>${fmt(fromCents(himC))}</span></div>
-            <div class="receipt-amount-item"><div class="amount-dot" style="background:var(--her)"></div><span>${fmt(fromCents(herC))}</span></div>
+            <div class="receipt-amount-item"><div class="amount-dot" style="background:var(--him)"></div><span style="color:var(--him)">${fmt(fromCents(himC))}</span></div>
+            <div class="receipt-amount-item"><div class="amount-dot" style="background:var(--her)"></div><span style="color:var(--her)">${fmt(fromCents(herC))}</span></div>
+            ${otherC > 0 ? `<div class="receipt-amount-item"><div class="amount-dot" style="background:var(--other)"></div><span style="color:var(--other)">${fmt(fromCents(otherC))}</span></div>` : ''}
           </div>
         </div>
         <div class="receipt-body" id="card-body-${fid}">
@@ -834,7 +846,9 @@ window.renderHistory = function() {
         </div>
       </div>`;
     }).join('');
-  } catch (e) { console.error(e); }
+  } catch (error) {
+    window.showToast("Erro ao renderizar histórico: " + error.message);
+  }
 };
 
 window.renderReport = function() {
