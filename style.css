@@ -1143,6 +1143,10 @@ body {
 /* ══ DIVIDER ══ */
 .divider { height: 1px; background: var(--border); margin: 1rem 0; }
 
+/* ══ PERSONAL DASHBOARD SPECIFICS ══ */
+.text-green { color: var(--both); font-weight: 800; }
+.text-red { color: var(--her); font-weight: 800; }
+
 /* ══ DESKTOP ══ */
 @media (min-width: 640px) {
   .bottom-nav { display: none; }
