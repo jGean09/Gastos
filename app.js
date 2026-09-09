@@ -919,7 +919,7 @@ window.renderHistory = function() {
     const category = document.getElementById('filter-category')?.value || '';
     const searchRaw = document.getElementById('history-search')?.value.trim().toLowerCase() || '';
     
-    let list = allReceipts.filter(r => !r.scope);
+    let list = allReceipts.filter(r => !r.scope && r.type !== 'settlement');
     
     if (cycle === 'current') {
        list = list.filter(r => !r.cycle || r.cycle === 'current');
@@ -952,23 +952,6 @@ window.renderHistory = function() {
       const names = r.names || getNames();
       const dateStr = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
       const fid = r._fireId;
-
-      if (r.type === 'settlement') {
-        const payerName = r.payer === 'him' ? names.him : names.her;
-        const color = r.payer === 'him' ? 'var(--him)' : 'var(--her)';
-        return `<div class="receipt-card" style="animation-delay:${idx * 0.04}s; border-color:${color};">
-          <div class="receipt-head" style="align-items:center;">
-            <div>
-              <div class="receipt-store" style="color:${color}">${r.store}</div>
-              <div class="receipt-date">${dateStr} • Por ${payerName}</div>
-            </div>
-            <div style="font-weight:900; font-size:1.1rem; color:${color};">${fmt(fromCents(r.amountCents))}</div>
-          </div>
-          <div style="padding: 0 1.25rem 1rem 1.25rem; text-align:right;">
-             <button class="btn-ghost" style="border:none; padding:0.2rem; font-size:0.75rem; color:var(--muted);" onclick="window.deleteReceipt('${fid}')">🗑️ Apagar Pix</button>
-          </div>
-        </div>`;
-      }
 
       const himC = r.himCents || 0; const herC = r.herCents || 0; const otherC = r.otherCents || 0;
       const isPaid = r.status === 'paid';
@@ -1066,19 +1049,46 @@ window.renderReport = function() {
       }
     });
 
-    let settlementHTML = '';
+    let settlementsHTML = '';
+    let settlements = list.filter(r => r.type === 'settlement');
+    if (settlements.length > 0) {
+      let sRows = settlements.map(s => {
+         const payerName = s.payer === 'him' ? names.him : names.her;
+         const dStr = new Date(s.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+         return `<div class="store-row" style="border-left: 3px solid var(--both); padding-left:0.75rem;">
+           <div style="flex:1">
+             <div style="font-weight:700">Adiantamento / Pix de ${payerName}</div>
+             <div style="font-size:0.7rem; color:var(--muted2);">${dStr}</div>
+           </div>
+           <div style="text-align:right">
+             <div style="color:var(--both); font-weight:800">+ ${fmt(fromCents(s.amountCents))}</div>
+             <button class="btn-ghost" style="border:none; padding:0.2rem; font-size:0.7rem; color:var(--muted); margin-top:0.25rem;" onclick="window.deleteReceipt('${s._fireId}')">Apagar Pix</button>
+           </div>
+         </div>`;
+      }).join('');
+      settlementsHTML = `<div class="card" style="margin-bottom:1rem; border-color:var(--both);">
+        <div class="card-header" style="color:var(--both)">💸 Pagamentos Parciais (Já Realizados)</div>
+        <div style="padding:0.75rem 1.25rem 1rem 1.25rem;">
+          ${sRows}
+        </div>
+      </div>`;
+    }
+
+    let finalHTML = '';
+    const btnHtml = `<button class="btn btn-primary btn-sm" onclick="window.openSettleModal()" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 0.4rem; font-weight:700; border-radius:var(--radius-sm);">💸 Abater Valor (Registrar Pix)</button>`;
+    
     if (runningBalanceCents > 0) {
-      settlementHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--both)"><div class="card-header" style="color:var(--both)">🤝 Acerto (Nesta Fatura)</div><div style="padding:1.25rem;text-align:center"><div style="font-size:0.85rem;color:var(--muted2);margin-bottom:0.4rem">${names.her} deve pagar para ${names.him}</div><div style="font-size:2rem;font-weight:900;color:var(--both);letter-spacing:-1px">${fmt(fromCents(runningBalanceCents))}</div></div></div>`;
+      finalHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--both)"><div class="card-header" style="color:var(--both)">🤝 Falta Pagar (Nesta Fatura)</div><div style="padding:1.25rem;text-align:center"><div style="font-size:0.85rem;color:var(--muted2);margin-bottom:0.4rem">${names.her} deve pagar para ${names.him}</div><div style="font-size:2.2rem;font-weight:900;color:var(--both);letter-spacing:-1px;margin-bottom:1rem;">${fmt(fromCents(runningBalanceCents))}</div>${btnHtml}</div></div>`;
     } else if (runningBalanceCents < 0) {
-      settlementHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--her)"><div class="card-header" style="color:var(--her)">🤝 Acerto (Nesta Fatura)</div><div style="padding:1.25rem;text-align:center"><div style="font-size:0.85rem;color:var(--muted2);margin-bottom:0.4rem">${names.him} deve pagar para ${names.her}</div><div style="font-size:2rem;font-weight:900;color:var(--her);letter-spacing:-1px">${fmt(fromCents(Math.abs(runningBalanceCents)))}</div></div></div>`;
+      finalHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--her)"><div class="card-header" style="color:var(--her)">🤝 Falta Pagar (Nesta Fatura)</div><div style="padding:1.25rem;text-align:center"><div style="font-size:0.85rem;color:var(--muted2);margin-bottom:0.4rem">${names.him} deve pagar para ${names.her}</div><div style="font-size:2.2rem;font-weight:900;color:var(--her);letter-spacing:-1px;margin-bottom:1rem;">${fmt(fromCents(Math.abs(runningBalanceCents)))}</div>${btnHtml}</div></div>`;
     } else {
-      settlementHTML = `<div class="card" style="margin-bottom:1rem"><div class="card-header">🤝 Acerto (Nesta Fatura)</div><div style="padding:1.25rem;text-align:center;font-weight:700;color:var(--both)">Tudo quite nesta fatura! ✅</div></div>`;
+      finalHTML = `<div class="card" style="margin-bottom:1rem"><div class="card-header">🤝 Falta Pagar (Nesta Fatura)</div><div style="padding:1.25rem;text-align:center;font-weight:700;color:var(--both)">Tudo quite nesta fatura! ✅<div style="margin-top:1rem">${btnHtml}</div></div></div>`;
     }
 
     let listGastos = list.filter(r => r.type !== 'settlement' && r.type !== 'rollover');
 
-    if (!listGastos.length && runningBalanceCents === 0) {
-      container.innerHTML = `${settlementHTML}<div class="empty"><div class="empty-icon">📊</div><p>Nenhum dado nesta fatura.</p></div>`;
+    if (!listGastos.length && runningBalanceCents === 0 && settlements.length === 0) {
+      container.innerHTML = `${finalHTML}<div class="empty"><div class="empty-icon">📊</div><p>Nenhum dado nesta fatura.</p></div>`;
       return;
     }
 
@@ -1124,7 +1134,8 @@ window.renderReport = function() {
     const exportBtn = `<div style="margin-bottom:1rem;display:flex;justify-content:flex-end"><button class="btn btn-ghost btn-sm" onclick="window.exportCSV()">📥 Exportar CSV desta Fatura</button></div>`;
 
     container.innerHTML = `
-      ${settlementHTML}
+      ${finalHTML}
+      ${settlementsHTML}
       ${thirdPartyHTML}
       ${goalHTML}
       ${statsHTML}
