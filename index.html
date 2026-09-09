@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Gastos do Casal 💰</title>
+<meta name="description" content="Controle financeiro inteligente do casal — acompanhe, divida e feche contas juntos.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -22,6 +23,7 @@
       <div>
         <div class="login-title">Gastos Casal</div>
         <div class="login-subtitle">Controle financeiro do lar</div>
+        <div id="login-profile-hint" class="login-profile-hint" style="display:none"></div>
       </div>
     </div>
     <div class="login-field-wrap">
@@ -44,6 +46,7 @@
       Gastos Casal
     </div>
     <div style="display:flex;align-items:center;gap:0.75rem">
+      <div id="profile-badge" class="profile-badge" style="display:none"></div>
       <div class="sync-dot" id="sync-dot" title="Status da sincronização"></div>
       <nav class="desktop-nav">
         <button class="desktop-nav-btn active" onclick="window.showPage('add',this,'nav-add')">＋ Gastos</button>
@@ -57,22 +60,26 @@
 
   <div id="page-add" class="page active">
     <div class="tab-bar">
-      <button class="tab-btn active" id="tab-quick" onclick="window.switchTab('quick')">💸 Lançamento Rápido</button>
+      <button class="tab-btn active" id="tab-quick" onclick="window.switchTab('quick')">⚡ Lançamento Rápido</button>
       <button class="tab-btn" id="tab-cupom" onclick="window.switchTab('cupom')">🧾 Ler Cupom</button>
     </div>
 
     <div id="tab-content-quick" class="tab-content active">
-      <div class="card" style="border-color: var(--other);">
-        <div class="card-header" style="color: var(--other);">💸 Lançamento Rápido / Empréstimo</div>
+      <div class="card quick-card">
+        <div class="card-header">⚡ Novo Gasto</div>
         <div style="padding: 1.25rem;">
           <div class="meta-grid">
             <div style="grid-column: span 2;">
-              <label class="field-label">O que é?</label>
-              <input class="field-input" id="quick-desc" placeholder="Ex: Empréstimo João, Lanche, Uber...">
+              <label class="field-label">Descrição / Estabelecimento</label>
+              <input class="field-input" id="quick-desc" placeholder="Ex: Uber, iFood, Farmácia, Lanche...">
             </div>
             <div>
-              <label class="field-label">Valor</label>
-              <input class="field-input" type="number" step="0.01" min="0" id="quick-price" placeholder="R$ 0,00">
+              <label class="field-label">Valor (R$)</label>
+              <input class="field-input" type="number" step="0.01" min="0" id="quick-price" placeholder="0,00">
+            </div>
+            <div>
+              <label class="field-label">Data</label>
+              <input class="field-input" type="date" id="quick-date">
             </div>
             <div>
               <label class="field-label">Categoria</label>
@@ -87,6 +94,10 @@
                 <option value="educacao">📚 Educação</option>
                 <option value="roupas">👕 Roupas</option>
               </select>
+            </div>
+            <div>
+              <label class="field-label">Método de Pagamento</label>
+              <input class="field-input" id="quick-method" placeholder="Ex: Nubank, Débito, Dinheiro">
             </div>
             <div>
               <label class="field-label">Quem pagou?</label>
@@ -106,7 +117,7 @@
               <input class="field-input" id="quick-other-name" placeholder="Ex: Marcos, Mãe, etc...">
             </div>
           </div>
-          <button class="btn btn-primary" style="width:100%; margin-top:0.5rem; background: var(--other); color: #000;" onclick="window.saveQuickExpense()">💾 Salvar Lançamento</button>
+          <button class="btn btn-quick-save" onclick="window.saveQuickExpense()">⚡ Salvar Gasto</button>
         </div>
       </div>
     </div>
@@ -198,6 +209,10 @@
   <div id="page-history" class="page">
     <div class="page-title">Histórico</div>
     <div class="page-sub">Visualize as faturas fechadas ou os lançamentos atuais.</div>
+    <div class="search-bar-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="search" class="search-input" id="history-search" placeholder="Buscar por estabelecimento..." oninput="window.renderHistory()">
+    </div>
     <div class="filter-bar">
       <select class="filter-select" id="filter-cycle" onchange="window.renderHistory()">
         <option value="current">🧾 Fatura Atual (Aberta)</option>
@@ -239,11 +254,11 @@
 
   <div id="page-personal" class="page">
     <div class="page-title">Painel Pessoal</div>
-    <div class="page-sub">Controle individual de gastos e faturas.</div>
+    <div class="page-sub">Controle individual de gastos e receitas.</div>
 
-    <div class="card" style="margin-bottom: 1rem; border-color: var(--him);">
+    <div class="card" id="personal-owner-card" style="margin-bottom: 1rem; border-color: var(--him);">
       <div class="card-header" style="padding: 0.75rem 1.25rem; display: flex; align-items: center; justify-content: space-between;">
-        <span>👤 De quem é este painel?</span>
+        <span>👤 <span id="personal-owner-label">De quem é este painel?</span></span>
         <select class="filter-select" id="personal-owner" onchange="window.renderPersonalDashboard()" style="background:var(--card2); padding: 0.2rem 0.5rem; border-color:var(--border);">
           <option value="him">Meu Painel</option>
           <option value="her">Painel Dela</option>
@@ -292,11 +307,17 @@
     </div>
 
     <div class="card" style="margin-bottom:1rem">
-      <div class="card-header">🔒 Segurança</div>
+      <div class="card-header">🔒 Segurança — Senhas de Acesso</div>
       <div class="settings-row" style="display:block">
-        <label class="field-label">Nova senha de acesso</label>
-        <input class="settings-input" type="password" id="new-password" placeholder="Digite a nova senha..." style="margin-top:0.4rem">
-        <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" onclick="window.changePassword()">Alterar senha</button>
+        <label class="field-label">Sua senha (acesso principal)</label>
+        <input class="settings-input" type="password" id="new-password" placeholder="Nova senha sua..." style="margin-top:0.4rem">
+        <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" onclick="window.changePassword()">Alterar minha senha</button>
+      </div>
+      <div class="settings-row" style="display:block">
+        <label class="field-label">Senha da Parceira(o)</label>
+        <input class="settings-input" type="password" id="new-password-her" placeholder="Nova senha dela/dele..." style="margin-top:0.4rem">
+        <p style="font-size:0.72rem;color:var(--muted2);margin-top:0.3rem">Quem entrar com esta senha vai diretamente para o painel pessoal dela/dele.</p>
+        <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" onclick="window.changePasswordHer()">Alterar senha dela/dele</button>
       </div>
     </div>
 
@@ -329,7 +350,38 @@
     </button>
   </nav>
 
-</div> <div id="edit-modal" class="modal-overlay" onclick="if(event.target===this)window.closeEditModal()">
+</div> <!-- Modal de Acerto Avulso (Pix) -->
+<div id="settle-modal" class="modal-overlay" onclick="if(event.target===this)window.closeSettleModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span>💸 Registrar Pix / Acerto Avulso</span>
+      <button class="modal-close" onclick="window.closeSettleModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size: 0.85rem; color: var(--muted2); margin-bottom: 1rem;">Registre um pix ou pagamento avulso sem fechar a fatura.</p>
+      <div class="meta-grid">
+        <div style="grid-column: span 2;">
+          <label class="field-label">Quem está pagando?</label>
+          <select class="field-input" id="settle-payer"></select>
+        </div>
+        <div>
+          <label class="field-label">Valor (R$)</label>
+          <input class="field-input" type="number" step="0.01" min="0" id="settle-amount" placeholder="0,00">
+        </div>
+        <div>
+          <label class="field-label">Data</label>
+          <input class="field-input" type="date" id="settle-date">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="window.closeSettleModal()">Cancelar</button>
+      <button class="btn btn-success btn-sm" onclick="window.saveSettlement()">💸 Registrar Pix</button>
+    </div>
+  </div>
+</div>
+
+<div id="edit-modal" class="modal-overlay" onclick="if(event.target===this)window.closeEditModal()">
   <div class="modal-box">
     <div class="modal-header">
       <span>✏️ Editar Lançamento</span>

@@ -1177,3 +1177,66 @@ body {
 @media (max-width: 639px) {
   .desktop-nav { display: none; }
 }
+
+/* ══ NOVOS ESTILOS (MELHORIAS) ══ */
+.profile-badge {
+  padding: 0.35rem 0.6rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.search-bar-wrap {
+  position: relative;
+  margin-bottom: 1rem;
+}
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.9rem;
+  opacity: 0.6;
+}
+.search-input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+.search-input:focus {
+  outline: none;
+  border-color: var(--both);
+  background: rgba(52,211,153,0.05);
+}
+
+.quick-card {
+  border-color: var(--both);
+}
+.quick-card .card-header {
+  color: var(--both);
+}
+.btn-quick-save {
+  width: 100%;
+  margin-top: 1rem;
+  background: linear-gradient(135deg, var(--both), #22c55e);
+  color: #000;
+  border: none;
+  padding: 0.9rem;
+  border-radius: var(--radius-sm);
+  font-weight: 800;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-quick-save:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}

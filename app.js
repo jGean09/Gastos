@@ -27,7 +27,8 @@ let currentMime = 'image/jpeg';
 let currentProducts = [];
 let nextId = 0;
 let allReceipts = [];
-let appSettings = { him: 'Eu', her: 'Ela', password: '15112018', geminiKey: '', monthlyGoal: 0 };
+let appSettings = { him: 'Eu', her: 'Ela', password: '15112018', passwordHer: '', geminiKey: '', monthlyGoal: 0 };
+let loggedAs = sessionStorage.getItem('casal_logged_as') || null; // 'him' | 'her' | null
 
 let isSaving = false;
 let editingFireId = null;
@@ -112,8 +113,18 @@ window.verificarSenha = function() {
     if (!inputEl || !erroMsg) return;
     const input = inputEl.value;
     if (!input) { erroMsg.style.display = 'block'; erroMsg.textContent = 'Digite a senha!'; return; }
-    if (input === appSettings.password) {
+
+    // Verifica senha dela primeiro (se existir)
+    if (appSettings.passwordHer && input === appSettings.passwordHer) {
       erroMsg.style.display = 'none';
+      loggedAs = 'her';
+      sessionStorage.setItem('casal_logged_as', 'her');
+      localStorage.setItem('casal_auth', 'ok');
+      liberarAcesso();
+    } else if (input === appSettings.password) {
+      erroMsg.style.display = 'none';
+      loggedAs = 'him';
+      sessionStorage.setItem('casal_logged_as', 'him');
       localStorage.setItem('casal_auth', 'ok');
       liberarAcesso();
     } else {
@@ -138,6 +149,8 @@ function liberarAcesso() {
 
 window.logout = function() {
   localStorage.removeItem('casal_auth');
+  sessionStorage.removeItem('casal_logged_as');
+  loggedAs = null;
   location.reload();
 };
 
@@ -146,6 +159,10 @@ async function loadSettings() {
   try {
     const snap = await getDoc(doc(db, 'config', 'settings'));
     if (snap.exists()) appSettings = { ...appSettings, ...snap.data() };
+    // Se tem sessão salva mas a senha mudou ou não existe, mantém o loggedAs existente
+    if (!loggedAs) {
+      loggedAs = sessionStorage.getItem('casal_logged_as') || 'him';
+    }
   } catch(e) { console.error(e); }
 }
 
@@ -609,9 +626,43 @@ async function initApp() {
     document.getElementById('name-him').value = appSettings.him;
     document.getElementById('name-her').value = appSettings.her;
     document.getElementById('meta-date').value = today();
+    document.getElementById('quick-date').value = today();
     const goalEl = document.getElementById('monthly-goal');
     if (goalEl) goalEl.value = appSettings.monthlyGoal > 0 ? fromCents(appSettings.monthlyGoal).toFixed(2) : '';
     window.updatePayerSelect();
+
+    // Mostrar badge de perfil logado no header
+    const names = getNames();
+    const profileBadge = document.getElementById('profile-badge');
+    if (profileBadge && loggedAs) {
+      const pName = loggedAs === 'him' ? names.him : names.her;
+      const pColor = loggedAs === 'him' ? 'var(--him)' : 'var(--her)';
+      profileBadge.style.display = 'flex';
+      profileBadge.style.borderColor = pColor;
+      profileBadge.innerHTML = `<span style="color:${pColor};font-weight:700;font-size:0.78rem">👤 ${pName.split(' ')[0]}</span>`;
+    }
+
+    // Configurar painel pessoal para o perfil logado
+    const ownerSel = document.getElementById('personal-owner');
+    const ownerLabel = document.getElementById('personal-owner-label');
+    const ownerCard = document.getElementById('personal-owner-card');
+    if (ownerSel && loggedAs) {
+      ownerSel.value = loggedAs;
+      if (loggedAs === 'her') {
+        // Ela só vê o próprio painel
+        ownerSel.style.display = 'none';
+        if (ownerLabel) ownerLabel.textContent = `Painel de ${names.her.split(' ')[0]}`;
+        if (ownerCard) ownerCard.style.borderColor = 'var(--her)';
+      } else {
+        ownerSel.style.display = '';
+        if (ownerLabel) ownerLabel.textContent = 'De quem é este painel?';
+        if (ownerCard) ownerCard.style.borderColor = 'var(--him)';
+      }
+    }
+
+    // Configurar quick-payer para o perfil logado por padrão
+    const quickPayer = document.getElementById('quick-payer');
+    if (quickPayer && loggedAs) quickPayer.value = loggedAs;
 
     const zone = document.getElementById('upload-zone');
     if (zone) {
@@ -633,6 +684,8 @@ window.saveQuickExpense = async function() {
     const split = document.getElementById('quick-split').value;
     const otherName = document.getElementById('quick-other-name').value.trim();
     const category = document.getElementById('quick-category').value || 'outros';
+    const dateVal = document.getElementById('quick-date').value || today();
+    const method = document.getElementById('quick-method')?.value.trim() || 'Avulso';
 
     if (!desc || !price || price <= 0) { window.showToast('⚠️ Preencha os campos!'); return; }
     if (split === 'other' && !otherName) { window.showToast('⚠️ Digite o devedor!'); return; }
@@ -648,8 +701,11 @@ window.saveQuickExpense = async function() {
     const item = { id: Date.now(), name: desc, priceCents: itemCents, split, otherName: split === 'other' ? otherName : '' };
     const names = getNames();
     const receipt = {
-      id: Date.now(), store: 'Lançamento Avulso', date: today(), payer, method: 'Avulso', category, status: 'open',
-      cycle: 'current', 
+      id: Date.now(),
+      store: desc,           // ← CORRIGIDO: usa a descrição como nome do lançamento
+      date: dateVal,         // ← CORRIGIDO: usa a data escolhida pelo usuário
+      payer, method, category, status: 'open',
+      cycle: 'current',
       items: [item], himCents: himC, herCents: herC, otherCents: otherC, coupleCents: himC + herC, totalCents: himC + herC + otherC,
       imageBase64: null, imageMime: null, names: { him: names.him, her: names.her }, createdAt: Date.now()
     };
@@ -659,11 +715,13 @@ window.saveQuickExpense = async function() {
       window.showToast('✅ Salvo!');
       document.getElementById('quick-desc').value = '';
       document.getElementById('quick-price').value = '';
+      document.getElementById('quick-date').value = today();
+      if (document.getElementById('quick-method')) document.getElementById('quick-method').value = '';
       document.getElementById('quick-other-name').value = '';
       document.getElementById('quick-other-div').style.display = 'none';
       document.getElementById('quick-split').value = 'both';
       document.getElementById('quick-category').value = 'outros';
-      window.populateCycleSelects(); // CORREÇÃO AQUI
+      window.populateCycleSelects();
       window.renderHistory();
     }
   } catch (error) { console.error(error); } finally { isSaving = false; }
@@ -674,7 +732,15 @@ window.saveApiKey = function() { appSettings.geminiKey = document.getElementById
 window.saveApiKeySettings = function() { appSettings.geminiKey = document.getElementById('api-key-settings').value.trim(); document.getElementById('api-key-input').value = appSettings.geminiKey; saveSettingsToCloud(); };
 window.saveNames = function() { appSettings.him = document.getElementById('name-him').value || 'Eu'; appSettings.her = document.getElementById('name-her').value || 'Ela'; window.updatePayerSelect(); saveSettingsToCloud(); };
 window.saveGoal = function() { appSettings.monthlyGoal = cents(document.getElementById('monthly-goal').value); saveSettingsToCloud(); };
-window.changePassword = function() { const np = document.getElementById('new-password').value.trim(); if (!np) return; appSettings.password = np; saveSettingsToCloud(); document.getElementById('new-password').value = ''; window.showToast('✅ Senha alterada!'); };
+window.changePassword = function() { const np = document.getElementById('new-password').value.trim(); if (!np) return; appSettings.password = np; saveSettingsToCloud(); document.getElementById('new-password').value = ''; window.showToast('✅ Sua senha foi alterada!'); };
+window.changePasswordHer = function() {
+  const np = document.getElementById('new-password-her')?.value.trim();
+  if (!np) { window.showToast('⚠️ Digite a nova senha dela!'); return; }
+  appSettings.passwordHer = np;
+  saveSettingsToCloud();
+  document.getElementById('new-password-her').value = '';
+  window.showToast('✅ Senha dela alterada! Agora ela pode fazer login.');
+};
 
 window.clearAllData = async function() {
   if (!confirm('Apagar TODOS os dados (incluindo painel pessoal e faturas antigas)?')) return;
@@ -851,6 +917,7 @@ window.renderHistory = function() {
     const cycle = document.getElementById('filter-cycle')?.value || 'current';
     const person = document.getElementById('filter-person')?.value || '';
     const category = document.getElementById('filter-category')?.value || '';
+    const searchRaw = document.getElementById('history-search')?.value.trim().toLowerCase() || '';
     
     let list = allReceipts.filter(r => !r.scope);
     
@@ -863,6 +930,16 @@ window.renderHistory = function() {
     if (person === 'him') list = list.filter(r => r.type === 'settlement' ? r.payer === 'him' : r.himCents > 0);
     if (person === 'her') list = list.filter(r => r.type === 'settlement' ? r.payer === 'her' : r.herCents > 0);
     if (category) list = list.filter(r => r.type !== 'settlement' && (r.category || 'outros') === category);
+    
+    // Filtro de busca por texto
+    if (searchRaw) {
+      list = list.filter(r => {
+        const storeMatch = (r.store || '').toLowerCase().includes(searchRaw);
+        const itemMatch = r.items && r.items.some(i => (i.name || '').toLowerCase().includes(searchRaw));
+        return storeMatch || itemMatch;
+      });
+    }
+    
     list.sort((a, b) => b.date.localeCompare(a.date));
 
     const container = document.getElementById('history-list');
