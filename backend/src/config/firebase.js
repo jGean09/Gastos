@@ -1,4 +1,5 @@
-const admin = require('firebase-admin');
+const { initializeApp, cert } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -10,16 +11,13 @@ class FirebaseApp {
       return FirebaseApp._instance;
     }
     try {
-      // Usa credenciais da variável de ambiente GOOGLE_APPLICATION_CREDENTIALS (arquivo JSON)
-      // OU usa a variável FIREBASE_CREDENTIALS_JSON com o conteúdo do JSON em string
       if (process.env.FIREBASE_CREDENTIALS_JSON) {
         const serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS_JSON);
-        admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+        initializeApp({ credential: cert(serviceAccount) });
       } else {
-        // Fallback: usa o arquivo indicado por GOOGLE_APPLICATION_CREDENTIALS
-        admin.initializeApp({ credential: admin.credential.applicationDefault() });
+        initializeApp(); // Usa as credenciais padrão do ambiente
       }
-      this.db = admin.firestore();
+      this.db = getFirestore();
       console.log('✅ Firebase Admin inicializado com sucesso.');
     } catch (error) {
       console.error('❌ Erro ao inicializar o Firebase Admin:', error.message);
