@@ -804,12 +804,14 @@ window.renderReport = function() {
         const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0);
         const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
         const rOtherC = r.otherCents !== undefined ? r.otherCents : cents(r.otherTotal || 0);
-        himC += rHimC; herC += rHerC; otherC += rOtherC;
-        if (!storeMap[r.store]) storeMap[r.store] = { himC: 0, herC: 0 };
-        storeMap[r.store].himC += rHimC; storeMap[r.store].herC += rHerC;
-        const cat = r.category || 'outros';
-        if (!categoryMap[cat]) categoryMap[cat] = 0;
-        categoryMap[cat] += rHimC + rHerC + rOtherC;
+        if (r.type !== 'rollover') {
+          himC += rHimC; herC += rHerC; otherC += rOtherC;
+          if (!storeMap[r.store]) storeMap[r.store] = { himC: 0, herC: 0 };
+          storeMap[r.store].himC += rHimC; storeMap[r.store].herC += rHerC;
+          const cat = r.category || 'outros';
+          if (!categoryMap[cat]) categoryMap[cat] = 0;
+          categoryMap[cat] += rHimC + rHerC + rOtherC;
+        }
         if (r.status !== 'paid') {
           if (r.payer === 'him') { runningBalanceCents += rHerC; if (r.items) r.items.filter(i => i.split === 'other').forEach(i => { const n = i.otherName || 'Alguém'; thirdPartyDebts.him[n] = (thirdPartyDebts.him[n] || 0) + (i.priceCents || cents(i.price)); }); }
           else if (r.payer === 'her') { runningBalanceCents -= rHimC; if (r.items) r.items.filter(i => i.split === 'other').forEach(i => { const n = i.otherName || 'Alguém'; thirdPartyDebts.her[n] = (thirdPartyDebts.her[n] || 0) + (i.priceCents || cents(i.price)); }); }
@@ -908,7 +910,7 @@ window.renderGoals = function() {
     const names = getNames();
 
     // ── Calcular gastos da fatura atual por categoria e por pessoa ──
-    const current = AppState.allReceipts.filter(r => !r.scope && r.type !== 'settlement' && (!r.cycle || r.cycle === 'current'));
+    const current = AppState.allReceipts.filter(r => !r.scope && r.type !== 'settlement' && r.type !== 'rollover' && (!r.cycle || r.cycle === 'current'));
     const spentCat = {}; let spentHim = 0; let spentHer = 0;
     current.forEach(r => {
       const cat = r.category || 'outros';
