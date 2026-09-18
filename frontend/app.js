@@ -57,7 +57,7 @@ const AppState = {
   appSettings: {
     him: 'Eu', her: 'Ela', password: '15112018', passwordHer: '', geminiKey: '', monthlyGoal: 0,
     goals: {
-      categories: { mercado: 0, restaurante: 0, transporte: 0, saude: 0, lazer: 0, moradia: 0, educacao: 0, roupas: 0, outros: 0 },
+      categories: {},
       persons: { him: 0, her: 0 }
     }
   },
@@ -82,6 +82,24 @@ function fromCents(c) { return c / 100; }
 function fmt(v) { return 'R$ ' + fromCents(cents(v)).toFixed(2).replace('.', ','); }
 function today() { return new Date().toISOString().split('T')[0]; }
 function getNames() { return { him: AppState.appSettings.him || 'Eu', her: AppState.appSettings.her || 'Ela' }; }
+
+// ── Migra limites antigos de categorias (número → {him, her}) ──
+function normalizeCategoryLimits(categories) {
+  const out = {};
+  for (const key of Object.keys(categories || {})) {
+    const v = categories[key];
+    if (typeof v === 'number') {
+      // legado: divide igualmente os dois
+      const half = Math.round(v / 2);
+      out[key] = { him: half, her: v - half };
+    } else if (v && typeof v === 'object') {
+      out[key] = { him: v.him || 0, her: v.her || 0 };
+    } else {
+      out[key] = { him: 0, her: 0 };
+    }
+  }
+  return out;
+}
 
 const CATEGORY_LABELS = {
   mercado: '🛒 Mercado', restaurante: '🍽️ Restaurante', transporte: '🚗 Transporte',
@@ -298,6 +316,37 @@ window.renderPersonalDashboard = function() {
             <button class="btn-ghost" style="border:none; padding:0.2rem; font-size:0.7rem; color:var(--muted);" onclick="window.deleteReceipt('${r._fireId}')">Apagar</button></div>
           </div>`;
         }).join('');
+    
+    // ── Extração de Dívidas de Terceiros para este usuário ──
+    let thirdPartyHTML = '';
+    let hasDebts = false;
+    let debtsRows = '';
+    AppState.allReceipts.filter(r => !r.scope && r.status !== 'paid' && r.payer === owner).forEach(r => {
+      if (r.items) {
+        r.items.forEach((item, idx) => {
+          if (item.split === 'other' && !item.paid) {
+            hasDebts = true;
+            const amt = item.priceCents || cents(item.price);
+            const n = item.otherName || 'Alguém';
+            const dStr = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+            debtsRows += `<div class="store-row" style="border-bottom: 1px solid var(--border); padding: 0.75rem 0;">
+              <div style="flex:1;">
+                <div style="font-weight:700; font-size:0.85rem;">${n} <span style="font-weight:400; color:var(--muted2); font-size:0.75rem;">(de ${r.store})</span></div>
+                <div style="font-size:0.7rem; color:var(--muted2);">${dStr}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="color:var(--other); font-weight:800;">+ ${fmt(fromCents(amt))}</div>
+                <button class="btn-ghost" style="border:none; padding:0.2rem; font-size:0.7rem; color:var(--primary);" onclick="window.markItemPaid('${r._fireId}', ${idx})">Dar Baixa</button>
+              </div>
+            </div>`;
+          }
+        });
+      }
+    });
+    if (hasDebts) {
+      thirdPartyHTML = `<div class="card" style="margin-top:1.5rem; border-color:var(--other);"><div class="card-header" style="color:var(--other);">👥 A Receber de Terceiros</div><div style="padding:0 1.25rem 0.5rem 1.25rem;">${debtsRows}</div></div>`;
+    }
+
     const html = `
       <div class="card" style="margin-bottom:1.5rem">
         <div class="card-header">➕ Novo Lançamento Pessoal</div>
@@ -315,9 +364,28 @@ window.renderPersonalDashboard = function() {
         <div class="stat-card"><div class="stat-label">Minhas Saídas</div><div class="stat-value" style="color:var(--her)">${fmt(fromCents(expenseCents))}</div></div>
         <div class="stat-card" style="grid-column: span 2;"><div class="stat-label">Saldo em Conta / Sobra</div><div class="stat-value" style="color:${balanceColor}">${fmt(fromCents(balanceCents))}</div></div>
       </div>
-      <div class="card" style="margin-top:1.5rem;"><div class="card-header">📋 Meu Histórico</div><div style="padding:0 1.25rem 0.5rem 1.25rem;">${historyHTML}</div></div>`;
+      <div class="card" style="margin-top:1.5rem;"><div class="card-header">📋 Meu Histórico</div><div style="padding:0 1.25rem 0.5rem 1.25rem;">${historyHTML}</div></div>
+      ${thirdPartyHTML}`;
     document.getElementById('personal-dashboard-content').innerHTML = html;
   } catch (error) { console.error(error); }
+};
+
+window.markItemPaid = async function(fireId, itemIdx) {
+  const r = AppState.allReceipts.find(x => x._fireId === fireId);
+  if (!r || !r.items || !r.items[itemIdx]) return;
+  if (!confirm(`Marcar o valor de ${r.items[itemIdx].otherName || 'Alguém'} como pago?`)) return;
+  setSyncStatus('syncing');
+  r.items[itemIdx].paid = true;
+  try {
+    await api.updateReceipt(fireId, { items: r.items });
+    setSyncStatus('ok');
+    window.showToast('✅ Dívida de terceiro baixada!');
+    window.renderPersonalDashboard();
+    if (document.getElementById('page-report').classList.contains('active')) window.renderReport();
+  } catch (e) {
+    setSyncStatus('err'); console.error(e);
+    r.items[itemIdx].paid = false;
+  }
 };
 
 window.savePersonalTransaction = async function() {
@@ -794,7 +862,13 @@ window.renderReport = function() {
     else list = list.filter(r => r.cycle === cycle);
     const container = document.getElementById('report-content');
     const names = getNames();
-    let runningBalanceCents = 0; let thirdPartyDebts = { him: {}, her: {} };
+    let thirdPartyDebts = { him: {}, her: {} };
+    AppState.allReceipts.filter(r => !r.scope && r.status !== 'paid').forEach(r => {
+      if (r.payer === 'him') { if (r.items) r.items.filter(i => i.split === 'other' && !i.paid).forEach(i => { const n = i.otherName || 'Alguém'; thirdPartyDebts.him[n] = (thirdPartyDebts.him[n] || 0) + (i.priceCents || cents(i.price)); }); }
+      else if (r.payer === 'her') { if (r.items) r.items.filter(i => i.split === 'other' && !i.paid).forEach(i => { const n = i.otherName || 'Alguém'; thirdPartyDebts.her[n] = (thirdPartyDebts.her[n] || 0) + (i.priceCents || cents(i.price)); }); }
+    });
+
+    let runningBalanceCents = 0;
     let himC = 0, herC = 0, otherC = 0; const storeMap = {}; const categoryMap = {};
     list.forEach(r => {
       if (r.type === 'settlement') {
@@ -809,12 +883,14 @@ window.renderReport = function() {
           if (!storeMap[r.store]) storeMap[r.store] = { himC: 0, herC: 0 };
           storeMap[r.store].himC += rHimC; storeMap[r.store].herC += rHerC;
           const cat = r.category || 'outros';
-          if (!categoryMap[cat]) categoryMap[cat] = 0;
-          categoryMap[cat] += rHimC + rHerC + rOtherC;
+          if (!categoryMap[cat]) categoryMap[cat] = { total: 0, him: 0, her: 0 };
+          categoryMap[cat].total += rHimC + rHerC + rOtherC;
+          categoryMap[cat].him += rHimC;
+          categoryMap[cat].her += rHerC;
         }
         if (r.status !== 'paid') {
-          if (r.payer === 'him') { runningBalanceCents += rHerC; if (r.items) r.items.filter(i => i.split === 'other').forEach(i => { const n = i.otherName || 'Alguém'; thirdPartyDebts.him[n] = (thirdPartyDebts.him[n] || 0) + (i.priceCents || cents(i.price)); }); }
-          else if (r.payer === 'her') { runningBalanceCents -= rHimC; if (r.items) r.items.filter(i => i.split === 'other').forEach(i => { const n = i.otherName || 'Alguém'; thirdPartyDebts.her[n] = (thirdPartyDebts.her[n] || 0) + (i.priceCents || cents(i.price)); }); }
+          if (r.payer === 'him') runningBalanceCents += rHerC;
+          else if (r.payer === 'her') runningBalanceCents -= rHimC;
         }
       }
     });
@@ -846,7 +922,21 @@ window.renderReport = function() {
     const donutSegs = [{ value: himC, color: 'var(--him)', label: names.him, val: fmt(fromCents(himC)) }, { value: herC, color: 'var(--her)', label: names.her, val: fmt(fromCents(herC)) }];
     if (otherC > 0) donutSegs.push({ value: otherC, color: 'var(--other)', label: 'Terceiros', val: fmt(fromCents(otherC)) });
     const donutHTML = `<div class="card" style="margin-bottom:1rem"><div class="card-header">🍩 Proporção de gastos</div><div class="donut-wrap">${buildDonutSVG(donutSegs)}<div class="donut-legend">${donutSegs.map(s => `<div class="donut-legend-item"><div class="donut-legend-dot" style="background:${s.color}"></div><span class="donut-legend-label">${s.label}</span><span class="donut-legend-value" style="color:${s.color}">${s.val}</span></div>`).join('')}<div class="donut-legend-item" style="margin-top:0.25rem;padding-top:0.5rem;border-top:1px solid var(--border)"><span class="donut-legend-label">Proporção</span><span class="donut-legend-value" style="color:var(--muted2)">${himPct}% / ${herPct}%</span></div></div></div></div>`;
-    const catRows = Object.entries(categoryMap).sort((a, b) => b[1] - a[1]).map(([cat, val]) => { const pctBar = grandC > 0 ? Math.round(val / grandC * 100) : 0; return `<div class="cat-row"><span style="min-width:100px;font-size:0.82rem;font-weight:600">${catLabel(cat)}</span><div class="cat-row-bar"><div class="cat-row-fill" style="width:${pctBar}%"></div></div><span class="cat-row-value">${fmt(fromCents(val))}</span></div>`; }).join('');
+    const catRows = Object.entries(categoryMap).sort((a, b) => b[1].total - a[1].total).map(([cat, val]) => { 
+      const pctBar = grandC > 0 ? Math.round(val.total / grandC * 100) : 0; 
+      return `
+        <div class="cat-row" style="flex-direction:column; align-items:stretch; gap:0.4rem; padding: 0.75rem 0;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:0.82rem;font-weight:700">${catLabel(cat)}</span>
+            <span class="cat-row-value" style="font-size:0.9rem">${fmt(fromCents(val.total))}</span>
+          </div>
+          <div class="cat-row-bar" style="margin: 0;"><div class="cat-row-fill" style="width:${pctBar}%"></div></div>
+          <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--muted2);">
+            <span>${names.him}: <strong style="color:var(--him)">${fmt(fromCents(val.him))}</strong></span>
+            <span>${names.her}: <strong style="color:var(--her)">${fmt(fromCents(val.her))}</strong></span>
+          </div>
+        </div>`; 
+    }).join('');
     const categoryHTML = grandC > 0 ? `<div class="card" style="margin-bottom:1rem"><div class="card-header">📂 Gastos por categoria</div><div style="padding:0.5rem 1.25rem">${catRows}</div></div>` : '';
     const storeRows = Object.entries(storeMap).sort((a, b) => (b[1].himC + b[1].herC) - (a[1].himC + a[1].herC)).slice(0, 8).map(([store, v]) => `<div class="store-row"><span class="store-name">${store}</span><div class="store-amounts"><span style="color:var(--him)">${fmt(fromCents(v.himC))}</span><span style="color:var(--her)">${fmt(fromCents(v.herC))}</span></div></div>`).join('');
     const receiptRows = [...listGastos].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(r => { const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0); const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0); const d = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }); return `<div class="store-row" style="${r.status === 'paid' ? 'opacity:0.6' : ''}"><span>${d} — ${r.store} <span class="category-badge">${catLabel(r.category || 'outros')}</span></span><div class="store-amounts"><span style="color:var(--him)">${fmt(fromCents(rHimC))}</span><span style="color:var(--her)">${fmt(fromCents(rHerC))}</span></div></div>`; }).join('');
@@ -911,32 +1001,51 @@ window.renderGoals = function() {
 
     // ── Calcular gastos da fatura atual por categoria e por pessoa ──
     const current = AppState.allReceipts.filter(r => !r.scope && r.type !== 'settlement' && r.type !== 'rollover' && (!r.cycle || r.cycle === 'current'));
-    const spentCat = {}; let spentHim = 0; let spentHer = 0;
+    const spentCat = {}; const spentCatHim = {}; const spentCatHer = {};
+    let spentHim = 0; let spentHer = 0;
     current.forEach(r => {
       const cat = r.category || 'outros';
       const total = (r.himCents || 0) + (r.herCents || 0);
       spentCat[cat] = (spentCat[cat] || 0) + total;
+      spentCatHim[cat] = (spentCatHim[cat] || 0) + (r.himCents || 0);
+      spentCatHer[cat] = (spentCatHer[cat] || 0) + (r.herCents || 0);
       spentHim += r.himCents || 0;
       spentHer += r.herCents || 0;
     });
 
     // ── Renderizar inputs de categoria ──
+    const normalizedCats = normalizeCategoryLimits(g.categories || {});
     const catContainer = document.getElementById('goals-category-inputs');
     if (catContainer) {
       catContainer.innerHTML = GOALS_CATEGORIES.map(({ key, label }) => {
-        const limitCents = (g.categories || {})[key] || 0;
-        const limitVal = limitCents > 0 ? fromCents(limitCents).toFixed(2) : '';
-        return `<div style="margin-bottom:1rem">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem">
-            <span style="font-size:0.88rem;font-weight:600;min-width:120px">${label}</span>
-            <div style="display:flex;align-items:center;gap:0.4rem;flex:1">
-              <span style="font-size:0.8rem;color:var(--muted2)">R$</span>
-              <input class="field-input" type="number" step="0.01" min="0" placeholder="Sem limite"
-                value="${limitVal}" style="flex:1;padding:0.4rem 0.6rem;font-size:0.85rem"
-                oninput="window.updateGoalCategory('${key}', this.value)">
+        const lim = normalizedCats[key] || { him: 0, her: 0 };
+        const limHim = lim.him; const limHer = lim.her;
+        const limCouple = limHim + limHer;
+        const valCouple = limCouple > 0 ? fromCents(limCouple).toFixed(2) : '';
+        const valHim    = limHim    > 0 ? fromCents(limHim).toFixed(2)    : '';
+        const valHer    = limHer    > 0 ? fromCents(limHer).toFixed(2)    : '';
+        return `<div style="margin-bottom:1.25rem">
+          <div style="font-size:0.88rem;font-weight:700;margin-bottom:0.5rem">${label}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.4rem">
+            <div style="display:flex;flex-direction:column;gap:0.25rem">
+              <label style="font-size:0.7rem;color:var(--muted2);font-weight:600">CASAL</label>
+              <input id="cat-couple-${key}" class="field-input" type="number" step="0.01" min="0" placeholder="—"
+                value="${valCouple}" style="padding:0.4rem 0.5rem;font-size:0.82rem;width:100%"
+                oninput="window.updateGoalCategory('${key}','casal',this.value)" data-cat="${key}" data-who="casal">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.25rem">
+              <label style="font-size:0.7rem;color:var(--him);font-weight:600">${names.him.toUpperCase()}</label>
+              <input id="cat-him-${key}" class="field-input" type="number" step="0.01" min="0" placeholder="—"
+                value="${valHim}" style="padding:0.4rem 0.5rem;font-size:0.82rem;width:100%;border-color:var(--him)"
+                oninput="window.updateGoalCategory('${key}','him',this.value)" data-cat="${key}" data-who="him">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.25rem">
+              <label style="font-size:0.7rem;color:var(--her);font-weight:600">${names.her.toUpperCase()}</label>
+              <input id="cat-her-${key}" class="field-input" type="number" step="0.01" min="0" placeholder="—"
+                value="${valHer}" style="padding:0.4rem 0.5rem;font-size:0.82rem;width:100%;border-color:var(--her)"
+                oninput="window.updateGoalCategory('${key}','her',this.value)" data-cat="${key}" data-who="her">
             </div>
           </div>
-          ${goalBar(spentCat[key] || 0, limitCents)}
         </div>`;
       }).join('');
     }
@@ -976,7 +1085,10 @@ window.renderGoals = function() {
     // ── Renderizar progresso geral (só categorias com limite definido) ──
     const progressContainer = document.getElementById('goals-progress-content');
     if (progressContainer) {
-      const withLimit = GOALS_CATEGORIES.filter(c => ((g.categories || {})[c.key] || 0) > 0);
+      const withLimit = GOALS_CATEGORIES.filter(c => {
+        const lim = normalizedCats[c.key] || { him: 0, her: 0 };
+        return lim.him > 0 || lim.her > 0;
+      });
       const himLimit = (g.persons || {}).him || 0;
       const herLimit = (g.persons || {}).her || 0;
       if (withLimit.length === 0 && himLimit === 0 && herLimit === 0) {
@@ -987,9 +1099,12 @@ window.renderGoals = function() {
       if (withLimit.length > 0) {
         html += '<div style="font-size:0.8rem;font-weight:700;color:var(--muted2);margin-bottom:0.75rem;text-transform:uppercase;letter-spacing:0.5px">Por Categoria</div>';
         html += withLimit.map(({ key, label }) => {
-          const spent = spentCat[key] || 0;
-          const limit = (g.categories || {})[key] || 0;
-          return `<div style="margin-bottom:1rem"><div style="font-weight:700;font-size:0.88rem">${label}</div>${goalBar(spent, limit)}</div>`;
+          const lim = normalizedCats[key] || { him: 0, her: 0 };
+          const bars = [
+            lim.him > 0 ? `<div style="font-size:0.72rem;color:var(--him);font-weight:600;margin-top:0.4rem">${names.him}</div>${goalBar(spentCatHim[key] || 0, lim.him)}` : '',
+            lim.her > 0 ? `<div style="font-size:0.72rem;color:var(--her);font-weight:600;margin-top:0.4rem">${names.her}</div>${goalBar(spentCatHer[key] || 0, lim.her)}` : ''
+          ].filter(Boolean).join('');
+          return `<div style="margin-bottom:1.1rem"><div style="font-weight:700;font-size:0.88rem">${label}</div>${bars}</div>`;
         }).join('');
       }
       if (himLimit > 0 || herLimit > 0) {
@@ -1003,10 +1118,32 @@ window.renderGoals = function() {
 };
 
 let _goalSaveTimer = null;
-window.updateGoalCategory = function(key, value) {
+window.updateGoalCategory = function(key, who, value) {
   if (!AppState.appSettings.goals) AppState.appSettings.goals = { categories: {}, persons: {} };
   if (!AppState.appSettings.goals.categories) AppState.appSettings.goals.categories = {};
-  AppState.appSettings.goals.categories[key] = cents(value);
+  const cats = AppState.appSettings.goals.categories;
+  // garante que o objeto do key é sempre {him, her}
+  const cur = normalizeCategoryLimits(cats)[key] || { him: 0, her: 0 };
+  if (who === 'casal') {
+    const total = cents(value);
+    const half  = Math.round(total / 2);
+    cur.him = half;
+    cur.her = total - half;
+    // atualizar os inputs individuais na tela sem re-render completo
+    const himEl = document.getElementById('cat-him-' + key);
+    const herEl = document.getElementById('cat-her-' + key);
+    if (himEl) himEl.value = cur.him > 0 ? fromCents(cur.him).toFixed(2) : '';
+    if (herEl) herEl.value = cur.her > 0 ? fromCents(cur.her).toFixed(2) : '';
+  } else {
+    cur[who] = cents(value);
+    // atualizar o input do casal na tela sem re-render completo
+    const coupleEl = document.getElementById('cat-couple-' + key);
+    if (coupleEl) {
+      const total = cur.him + cur.her;
+      coupleEl.value = total > 0 ? fromCents(total).toFixed(2) : '';
+    }
+  }
+  cats[key] = { him: cur.him, her: cur.her };
   clearTimeout(_goalSaveTimer);
   _goalSaveTimer = setTimeout(() => { saveSettingsToCloud(); window.renderGoals(); }, 800);
 };
