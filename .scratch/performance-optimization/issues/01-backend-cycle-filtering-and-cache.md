@@ -4,10 +4,10 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A API (`ExpenseController` e `ExpenseService`) recebe e trata um parâmetro `?cycle=current` (ou string específica).
-- [ ] Os dados passam a ser filtrados (pode ser via consulta no Firebase ou pós-busca em memória) antes de serem enviados ao cliente.
-- [ ] `ExpenseService` implementa um cache simples (objeto global ou Map) que guarda o resultado do Firebase.
-- [ ] O cache é retornado imediatamente se for válido.
-- [ ] O cache é invalidado e destruído (`cache = {}`) nos métodos de criação, exclusão e alteração de despesas ou fechamento de fatura.
+- [x] A API (`ExpenseController` e `ExpenseService`) recebe e trata um parâmetro `?cycle=current` (ou string específica).
+- [x] Os dados passam a ser filtrados (pode ser via consulta no Firebase ou pós-busca em memória) antes de serem enviados ao cliente.
+- [x] `ExpenseService` implementa um cache simples (objeto global ou Map) que guarda o resultado do Firebase.
+- [x] O cache é retornado imediatamente se for válido.
+- [x] O cache é invalidado e destruído (`cache.clear()`) nos métodos de criação, exclusão e alteração de despesas ou fechamento de fatura.

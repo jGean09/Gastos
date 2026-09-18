@@ -16,38 +16,65 @@ const { receiptRepo, configRepo } = require('../repositories/ExpenseRepository')
 // ── Strategy: calcula centavos a partir de um valor decimal ──
 function cents(v) { return Math.round((parseFloat(v) || 0) * 100); }
 
+/**
+ * ── Cache em Memória (Ticket 01 – Otimização de Performance) ──
+ * Armazena os recibos buscados do Firestore indexados por chave de ciclo.
+ * Invalidado em qualquer operação de escrita para garantir consistência.
+ * Chaves: 'current' | 'all'
+ */
+const _cache = new Map();
+
 class ExpenseService {
   // ──────────────────────────────────────────────
   //  RECIBOS
   // ──────────────────────────────────────────────
 
-  async getAllReceipts() {
-    return receiptRepo.findAll();
+  /**
+   * Retorna recibos filtrando por ciclo, servindo do cache em memória quando possível.
+   * @param {string} [cycle] - 'current' para fatura aberta, 'all' ou omitido para todos.
+   */
+  async getAllReceipts(cycle) {
+    const cacheKey = cycle || 'all';
+    if (_cache.has(cacheKey)) {
+      return _cache.get(cacheKey);
+    }
+    const all = await receiptRepo.findAll();
+    // Filtragem pós-busca: mantém compatibilidade sem exigir índices compostos no Firestore
+    const result = cycle === 'current'
+      ? all.filter(r => !r.cycle || r.cycle === 'current')
+      : all;
+    _cache.set(cacheKey, result);
+    return result;
   }
 
   async addReceipt(data) {
     // Validação básica (Single Responsibility: validar antes de persistir)
     if (!data.store && !data.type) throw new Error('Dados inválidos para o recibo.');
     data.createdAt = data.createdAt || Date.now();
+    _cache.clear(); // invalida cache após escrita
     return receiptRepo.create(data);
   }
 
   async deleteReceipt(id) {
     if (!id) throw new Error('ID inválido.');
+    _cache.clear(); // invalida cache após escrita
     return receiptRepo.delete(id);
   }
 
   async toggleReceiptStatus(id, currentStatus) {
     const newStatus = currentStatus === 'paid' ? 'open' : 'paid';
+    _cache.clear(); // invalida cache após escrita
     return receiptRepo.updateFields(id, { status: newStatus });
   }
 
   async updateReceipt(id, updates) {
     if (!id) throw new Error('ID inválido.');
+    _cache.clear(); // invalida cache após escrita
     return receiptRepo.updateFields(id, updates);
   }
 
   async clearAllReceipts() {
+    _cache.clear(); // invalida cache após escrita
     return receiptRepo.deleteAll();
   }
 
@@ -110,6 +137,7 @@ class ExpenseService {
       await receiptRepo.create(rolloverReceipt);
     }
 
+    _cache.clear(); // invalida cache após fechar fatura
     return { success: true, cycleName };
   }
 

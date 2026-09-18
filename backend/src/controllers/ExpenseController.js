@@ -15,7 +15,8 @@ class ExpenseController {
 
   async getAll(req, res) {
     try {
-      const receipts = await expenseService.getAllReceipts();
+      const { cycle } = req.query; // 'current' | 'all' | undefined
+      const receipts = await expenseService.getAllReceipts(cycle);
       res.json(receipts);
     } catch (e) {
       res.status(500).json({ error: e.message });
