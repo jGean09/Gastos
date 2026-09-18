@@ -920,16 +920,18 @@ window.renderReport = function() {
       if (r.type === 'settlement') {
         if (r.payer === 'him') runningBalanceCents += r.amountCents;
         else if (r.payer === 'her') runningBalanceCents -= r.amountCents;
-      } else if (r.status !== 'paid' && r.type !== 'rollover') {
+      } else {
         const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0);
         const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
-        if (r.payer === 'him') runningBalanceCents += rHerC;
-        else if (r.payer === 'her') runningBalanceCents -= rHimC;
-        globalHimC += rHimC; globalHerC += rHerC;
-      } else if (r.status === 'paid' && r.type !== 'rollover') {
-        const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0);
-        const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
-        globalHimC += rHimC; globalHerC += rHerC;
+        
+        if (r.type !== 'rollover') {
+          globalHimC += rHimC; globalHerC += rHerC;
+        }
+        
+        if (r.status !== 'paid') {
+          if (r.payer === 'him') runningBalanceCents += rHerC;
+          else if (r.payer === 'her') runningBalanceCents -= rHimC;
+        }
       }
     });
     const globalCoupleC = globalHimC + globalHerC;
