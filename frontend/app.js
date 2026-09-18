@@ -977,19 +977,21 @@ const GOALS_CATEGORIES = [
   { key: 'outros', label: '📦 Outros' }
 ];
 
-function goalBar(spent, limit) {
+function goalBar(spent, limit, accentColor) {
   if (!limit || limit === 0) return '';
   const pct = Math.min(100, Math.round(spent / limit * 100));
-  const color = pct >= 100 ? 'var(--her)' : pct >= 80 ? '#f59e0b' : 'var(--both)';
-  const label = pct >= 100 ? '🔴 ESTOURADO' : pct >= 80 ? '🟡 Atenção' : '🟢';
+  const overBudget  = pct >= 100;
+  const nearBudget  = pct >= 80;
+  const statusColor = overBudget ? 'var(--her)' : nearBudget ? '#f59e0b' : (accentColor || 'var(--both)');
+  const statusLabel = overBudget ? '🔴 ESTOURADO' : nearBudget ? '🟡 Atenção' : '🟢';
   return `
-    <div style="margin-top:0.5rem">
-      <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:0.3rem">
-        <span style="font-weight:600">${fmt(fromCents(spent))} / ${fmt(fromCents(limit))}</span>
-        <span style="color:${color};font-weight:700">${label} ${pct}%</span>
+    <div style="margin-top:0.4rem">
+      <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:0.25rem">
+        <span style="font-weight:600;color:var(--muted1)">${fmt(fromCents(spent))} / ${fmt(fromCents(limit))}</span>
+        <span style="color:${statusColor};font-weight:700">${statusLabel} ${pct}%</span>
       </div>
-      <div style="background:var(--card2);border-radius:99px;height:10px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:${color};border-radius:99px;transition:width 0.6s ease"></div>
+      <div style="background:var(--card2);border-radius:99px;height:8px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${statusColor};border-radius:99px;transition:width 0.6s ease"></div>
       </div>
     </div>`;
 }
@@ -1024,7 +1026,19 @@ window.renderGoals = function() {
         const valCouple = limCouple > 0 ? fromCents(limCouple).toFixed(2) : '';
         const valHim    = limHim    > 0 ? fromCents(limHim).toFixed(2)    : '';
         const valHer    = limHer    > 0 ? fromCents(limHer).toFixed(2)    : '';
-        return `<div style="margin-bottom:1.25rem">
+        const spentHim_cat = spentCatHim[key] || 0;
+        const spentHer_cat = spentCatHer[key] || 0;
+        const barHim = limHim > 0 ? `
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.6rem">
+            <span style="font-size:0.68rem;color:var(--him);font-weight:700;min-width:36px">${names.him}</span>
+            <div style="flex:1">${goalBar(spentHim_cat, limHim, 'var(--him)')}</div>
+          </div>` : '';
+        const barHer = limHer > 0 ? `
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.35rem">
+            <span style="font-size:0.68rem;color:var(--her);font-weight:700;min-width:36px">${names.her}</span>
+            <div style="flex:1">${goalBar(spentHer_cat, limHer, 'var(--her)')}</div>
+          </div>` : '';
+        return `<div style="margin-bottom:1.5rem;padding-bottom:1.1rem;border-bottom:1px solid var(--border)">
           <div style="font-size:0.88rem;font-weight:700;margin-bottom:0.5rem">${label}</div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.4rem">
             <div style="display:flex;flex-direction:column;gap:0.25rem">
@@ -1046,9 +1060,11 @@ window.renderGoals = function() {
                 oninput="window.updateGoalCategory('${key}','her',this.value)" data-cat="${key}" data-who="her">
             </div>
           </div>
+          ${barHim}${barHer}
         </div>`;
       }).join('');
     }
+
 
     // ── Renderizar inputs de pessoa ──
     const personContainer = document.getElementById('goals-person-inputs');
@@ -1101,8 +1117,16 @@ window.renderGoals = function() {
         html += withLimit.map(({ key, label }) => {
           const lim = normalizedCats[key] || { him: 0, her: 0 };
           const bars = [
-            lim.him > 0 ? `<div style="font-size:0.72rem;color:var(--him);font-weight:600;margin-top:0.4rem">${names.him}</div>${goalBar(spentCatHim[key] || 0, lim.him)}` : '',
-            lim.her > 0 ? `<div style="font-size:0.72rem;color:var(--her);font-weight:600;margin-top:0.4rem">${names.her}</div>${goalBar(spentCatHer[key] || 0, lim.her)}` : ''
+            lim.him > 0 ? `
+              <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem">
+                <span style="font-size:0.72rem;color:var(--him);font-weight:700;min-width:36px">${names.him}</span>
+                <div style="flex:1">${goalBar(spentCatHim[key] || 0, lim.him, 'var(--him)')}</div>
+              </div>` : '',
+            lim.her > 0 ? `
+              <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.35rem">
+                <span style="font-size:0.72rem;color:var(--her);font-weight:700;min-width:36px">${names.her}</span>
+                <div style="flex:1">${goalBar(spentCatHer[key] || 0, lim.her, 'var(--her)')}</div>
+              </div>` : ''
           ].filter(Boolean).join('');
           return `<div style="margin-bottom:1.1rem"><div style="font-weight:700;font-size:0.88rem">${label}</div>${bars}</div>`;
         }).join('');
