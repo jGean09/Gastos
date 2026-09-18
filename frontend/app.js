@@ -70,6 +70,7 @@ const AppState = {
   isSaving: false,
   editingFireId: null,
   editingItems: [],
+  historyTabFilter: 'couple',
 };
 
 // ── TRATAMENTO GLOBAL DE ERROS ──
@@ -792,17 +793,43 @@ window.populateCycleSelects = function() {
   } catch(e) { console.error(e); }
 };
 
+window.renderHistoryTabPills = function() {
+  const names = getNames();
+  const tab = AppState.historyTabFilter;
+  const tabs = [
+    { key: 'couple', icon: '\uD83D\uDC69\u200D\u2764\uFE0F\u200D\uD83D\uDC68', label: 'Casal',           activeClass: 'active-couple' },
+    { key: 'him',    icon: '\uD83D\uDD35',                                       label: names.him,         activeClass: 'active-him'    },
+    { key: 'her',    icon: '\uD83D\uDD34',                                       label: names.her,         activeClass: 'active-her'    },
+    { key: 'all',    icon: '\uD83C\uDF10',                                       label: 'Todos',           activeClass: 'active-all'    },
+  ];
+  const container = document.getElementById('history-tab-group');
+  if (!container) return;
+  container.innerHTML = tabs.map(t => {
+    const isActive = tab === t.key;
+    return `<button class="tab-pill${isActive ? ' ' + t.activeClass : ''}" onclick="window.setHistoryTab('${t.key}')">${t.icon} ${t.label}</button>`;
+  }).join('');
+};
+
+window.setHistoryTab = function(tab) {
+  AppState.historyTabFilter = tab;
+  window.renderHistory();
+};
+
 window.renderHistory = function() {
   try {
+    window.renderHistoryTabPills();
     const cycle = document.getElementById('filter-cycle')?.value || 'current';
-    const person = document.getElementById('filter-person')?.value || '';
     const category = document.getElementById('filter-category')?.value || '';
     const searchRaw = document.getElementById('history-search')?.value.trim().toLowerCase() || '';
+    const tab = AppState.historyTabFilter;
     let list = AppState.allReceipts.filter(r => !r.scope && r.type !== 'settlement');
     if (cycle === 'current') list = list.filter(r => !r.cycle || r.cycle === 'current');
     else list = list.filter(r => r.cycle === cycle);
-    if (person === 'him') list = list.filter(r => r.himCents > 0);
-    if (person === 'her') list = list.filter(r => r.herCents > 0);
+    // ── Filtragem por aba ──
+    if (tab === 'him')    list = list.filter(r => (r.himCents || 0) > 0 && (r.herCents || 0) === 0 && (r.otherCents || 0) === 0);
+    else if (tab === 'her')    list = list.filter(r => (r.herCents || 0) > 0 && (r.himCents || 0) === 0 && (r.otherCents || 0) === 0);
+    else if (tab === 'couple') list = list.filter(r => (r.himCents || 0) > 0 && (r.herCents || 0) > 0);
+    // tab === 'all': sem filtro extra
     if (category) list = list.filter(r => r.type !== 'settlement' && (r.category || 'outros') === category);
     if (searchRaw) list = list.filter(r => { const storeMatch = (r.store || '').toLowerCase().includes(searchRaw); const itemMatch = r.items && r.items.some(i => (i.name || '').toLowerCase().includes(searchRaw)); return storeMatch || itemMatch; });
     list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));

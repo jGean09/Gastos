@@ -226,14 +226,13 @@
         <input type="search" class="search-input" id="history-search" placeholder="Buscar por estabelecimento..."
           oninput="window.renderHistory()">
       </div>
+      <div class="tab-pill-group" id="history-tab-group"></div>
       <div class="filter-bar">
         <select class="filter-select" id="filter-cycle" onchange="window.renderHistory()">
           <option value="current">🧾 Fatura Atual (Aberta)</option>
         </select>
-        <select class="filter-select" id="filter-person" onchange="window.renderHistory()">
+        <select class="filter-select" id="filter-person" style="display:none">
           <option value="">Todos</option>
-          <option value="him">Só meus</option>
-          <option value="her">Só dela</option>
         </select>
         <select class="filter-select" id="filter-category" onchange="window.renderHistory()">
           <option value="">Todas categorias</option>

@@ -11,10 +11,10 @@ A filtragem de lançamentos na tela de Histórico deve seguir estritamente as re
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Remover o dropdown `filter-person` em `index.html` e adicionar a barra de pílulas de navegação por abas.
-- [ ] Adicionar estilos CSS para a barra de pílulas (`.tab-pill-group` e `.tab-pill`), incluindo o estado ativo (`.active`).
-- [ ] Atualizar o estado global em `AppState` para armazenar a aba ativa de histórico.
-- [ ] Atualizar a função `renderHistory()` em `app.js` para filtrar os recibos de acordo com a aba selecionada.
-- [ ] Garantir que o visual dos cards permaneça consistente (exibindo `🔵 R$ X` / `🔴 R$ Y`).
+- [x] Remover o dropdown `filter-person` em `index.html` e adicionar a barra de pílulas de navegação por abas.
+- [x] Adicionar estilos CSS para a barra de pílulas (`.tab-pill-group` e `.tab-pill`), incluindo o estado ativo (`.active`).
+- [x] Atualizar o estado global em `AppState` para armazenar a aba ativa de histórico.
+- [x] Atualizar a função `renderHistory()` em `app.js` para filtrar os recibos de acordo com a aba selecionada.
+- [x] Garantir que o visual dos cards permaneça consistente (exibindo `🔵 R$ X` / `🔴 R$ Y`).

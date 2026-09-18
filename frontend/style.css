@@ -714,6 +714,50 @@ body {
 }
 .filter-select option { background: var(--card2); }
 
+/* ══ TAB PILL GROUP ══ */
+.tab-pill-group {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.tab-pill {
+  background: var(--card2);
+  border: 1.5px solid var(--border2);
+  border-radius: 20px;
+  padding: 0.4rem 0.85rem;
+  color: var(--muted2);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+.tab-pill:hover { border-color: var(--border2); color: var(--text); transform: translateY(-1px); }
+
+.tab-pill.active-couple {
+  background: var(--both-bg);
+  border-color: var(--both);
+  color: var(--both);
+}
+.tab-pill.active-him {
+  background: var(--him-bg);
+  border-color: var(--him);
+  color: var(--him);
+}
+.tab-pill.active-her {
+  background: var(--her-bg);
+  border-color: var(--her);
+  color: var(--her);
+}
+.tab-pill.active-all {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.3);
+  color: var(--text);
+}
+
 /* ══ RECEIPT CARD ══ */
 .receipt-card {
   background: var(--card);
