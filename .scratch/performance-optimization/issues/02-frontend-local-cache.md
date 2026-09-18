@@ -4,10 +4,10 @@
 
 **Blocked by:** 01 (requer a API para buscar apenas o ciclo `current` de forma otimizada).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A função `initApp()` verifica o `localStorage.getItem('gastos_current_cycle')`.
-- [ ] Se os dados em cache existirem, eles são aplicados no `AppState.allReceipts` e a tela é renderizada na hora (0.01s).
-- [ ] O frontend faz a busca `api.getReceipts({ cycle: 'current' })`.
-- [ ] Enquanto busca, a UI exibe uma barra de alerta/carregamento sutil "Sincronizando..." (sem impedir cliques ou leitura da tela).
-- [ ] Ao obter resposta, o `localStorage` é salvo, o `AppState` é atualizado silenciósamente e a barra de sincronização desaparece.
+- [x] A função `initApp()` verifica o `localStorage.getItem('gastos_current_cycle')`.
+- [x] Se os dados em cache existirem, eles são aplicados no `AppState.allReceipts` e a tela é renderizada na hora (0.01s).
+- [x] O frontend faz a busca `api.getReceipts({ cycle: 'current' })`.
+- [x] Enquanto busca, a UI exibe uma barra de alerta/carregamento sutil "Sincronizando..." (sem impedir cliques ou leitura da tela).
+- [x] Ao obter resposta, o `localStorage` é salvo, o `AppState` é atualizado silenciósamente e a barra de sincronização desaparece.

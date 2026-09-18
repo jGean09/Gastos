@@ -37,7 +37,7 @@ const api = {
       throw e;
     }
   },
-  getReceipts:     ()         => api.request('GET',    '/receipts'),
+  getReceipts:     (cycle)    => api.request('GET',    cycle ? `/receipts?cycle=${cycle}` : '/receipts'),
   addReceipt:      (data)     => api.request('POST',   '/receipts', data),
   deleteReceipt:   (id)       => api.request('DELETE', `/receipts/${id}`),
   deleteAll:       ()         => api.request('DELETE', '/receipts/all'),
@@ -214,14 +214,54 @@ async function saveSettingsToCloud() {
   } catch(e) { window.showToast('❌ Falha ao salvar configurações.'); }
 }
 
-async function loadReceipts() {
-  setSyncStatus('syncing');
+// ── Cache Local (Ticket 02 – Otimização de Performance) ──
+const LOCAL_CACHE_KEY = 'gastos_current_cycle';
+
+function _readLocalCache() {
   try {
-    AppState.allReceipts = await api.getReceipts();
+    const raw = localStorage.getItem(LOCAL_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function _writeLocalCache(receipts) {
+  try { localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(receipts)); } catch { /* quota exceeded → ignora */ }
+}
+
+/** Apaga o cache local (chamar após fechar fatura ou limpar tudo) */
+window.clearLocalReceiptsCache = function() {
+  try { localStorage.removeItem(LOCAL_CACHE_KEY); } catch {}
+};
+
+function _showSyncBar(visible) {
+  const bar = document.getElementById('sync-bar');
+  if (bar) bar.style.display = visible ? 'flex' : 'none';
+}
+
+async function loadReceipts() {
+  // ── 1. Renderização instantânea do cache local ──
+  const cached = _readLocalCache();
+  if (cached) {
+    AppState.allReceipts = cached;
+    try { window.populateCycleSelects(); window.renderHistory(); } catch {}
+    _showSyncBar(true); // mostra "Sincronizando..." enquanto busca novidades
+  } else {
+    setSyncStatus('syncing');
+  }
+
+  // ── 2. Busca em background (apenas fatura atual) ──
+  try {
+    const fresh = await api.getReceipts('current');
+    AppState.allReceipts = fresh;
+    _writeLocalCache(fresh);
     setSyncStatus('ok');
   } catch(e) {
-    setSyncStatus('err'); window.showToast('❌ Erro ao baixar dados.');
+    setSyncStatus('err');
+    if (!cached) window.showToast('❌ Erro ao baixar dados.'); // só avisa se não tinha cache
+  } finally {
+    _showSyncBar(false);
   }
+
   try {
     window.populateCycleSelects(); window.renderHistory();
     if (document.getElementById('page-personal').classList.contains('active')) window.renderPersonalDashboard();
@@ -234,6 +274,7 @@ async function addReceiptToCloud(receipt) {
     const saved = await api.addReceipt(receipt);
     AppState.allReceipts.unshift(saved);
     AppState.allReceipts.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    _writeLocalCache(AppState.allReceipts);
     setSyncStatus('ok');
     return true;
   } catch(e) {
@@ -249,6 +290,7 @@ window.deleteReceipt = async function(fireId) {
   try {
     await api.deleteReceipt(fireId);
     AppState.allReceipts = AppState.allReceipts.filter(r => r._fireId !== fireId);
+    _writeLocalCache(AppState.allReceipts);
     setSyncStatus('ok'); window.showToast('🗑️ Removido com sucesso.');
     if (isPersonal) { window.renderPersonalDashboard(); }
     else { window.populateCycleSelects(); window.renderHistory(); window.renderReport(); }
@@ -262,6 +304,7 @@ window.toggleReceiptStatus = async function(fireId) {
     setSyncStatus('syncing');
     const updated = await api.toggleStatus(fireId, receipt.status);
     receipt.status = updated.status;
+    _writeLocalCache(AppState.allReceipts);
     setSyncStatus('ok'); window.renderHistory(); window.renderReport();
     window.showToast(receipt.status === 'paid' ? '✅ Marcado como pago!' : '🔄 Reaberto!');
   } catch(e) { setSyncStatus('err'); console.error(e); }
@@ -637,6 +680,7 @@ window.clearAllData = async function() {
   try {
     await api.deleteAll();
     AppState.allReceipts = []; setSyncStatus('ok');
+    window.clearLocalReceiptsCache(); // invalida cache local após limpar tudo
     window.populateCycleSelects(); window.renderHistory(); window.renderReport();
     if (document.getElementById('page-personal').classList.contains('active')) window.renderPersonalDashboard();
     window.showToast('🗑️ Limpeza concluída.');
