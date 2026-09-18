@@ -71,6 +71,7 @@ const AppState = {
   editingFireId: null,
   editingItems: [],
   historyTabFilter: 'couple',
+  reportTabFilter: 'all',
 };
 
 // ── TRATAMENTO GLOBAL DE ERROS ──
@@ -881,12 +882,40 @@ window.toggleCard = function(id) {
   try { document.getElementById('card-body-' + id)?.classList.toggle('open'); } catch(e) { console.error(e); }
 };
 
+window.renderReportTabPills = function() {
+  const names = getNames();
+  const tab = AppState.reportTabFilter;
+  const tabs = [
+    { key: 'all',    icon: '\uD83C\uDF10', label: 'Todos',     activeClass: 'active-all'    },
+    { key: 'couple', icon: '\uD83D\uDC69\u200D\u2764\uFE0F\u200D\uD83D\uDC68', label: 'Casal', activeClass: 'active-couple' },
+    { key: 'him',    icon: '\uD83D\uDD35', label: names.him,   activeClass: 'active-him'    },
+    { key: 'her',    icon: '\uD83D\uDD34', label: names.her,   activeClass: 'active-her'    },
+  ];
+  const container = document.getElementById('report-tab-group');
+  if (!container) return;
+  container.innerHTML = tabs.map(t => {
+    const isActive = tab === t.key;
+    return `<button class="tab-pill${isActive ? ' ' + t.activeClass : ''}" onclick="window.setReportTab('${t.key}')">${t.icon} ${t.label}</button>`;
+  }).join('');
+};
+
+window.setReportTab = function(tab) {
+  AppState.reportTabFilter = tab;
+  window.renderReport();
+};
+
 window.renderReport = function() {
   try {
+    window.renderReportTabPills();
     const cycle = document.getElementById('report-cycle')?.value || 'current';
+    const reportTab = AppState.reportTabFilter;
     let list = AppState.allReceipts.filter(r => !r.scope);
     if (cycle === 'current') list = list.filter(r => !r.cycle || r.cycle === 'current');
     else list = list.filter(r => r.cycle === cycle);
+    // ── Filtragem por aba do relatório ──
+    if (reportTab === 'him')    list = list.filter(r => r.type === 'settlement' || ((r.himCents || 0) > 0 && (r.herCents || 0) === 0 && (r.otherCents || 0) === 0));
+    else if (reportTab === 'her')    list = list.filter(r => r.type === 'settlement' || ((r.herCents || 0) > 0 && (r.himCents || 0) === 0 && (r.otherCents || 0) === 0));
+    else if (reportTab === 'couple') list = list.filter(r => r.type === 'settlement' || ((r.himCents || 0) > 0 && (r.herCents || 0) > 0));
     const container = document.getElementById('report-content');
     const names = getNames();
     let thirdPartyDebts = { him: {}, her: {} };

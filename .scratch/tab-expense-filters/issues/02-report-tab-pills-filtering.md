@@ -11,9 +11,9 @@ Ao alternar as abas, a função `renderReport()` deve recalcular dinamicamente o
 
 **Blocked by:** 01-history-tab-pills-ui
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Renderizar a barra de pílulas de navegação por abas no topo de `renderReport()`.
-- [ ] Aplicar o filtro da aba ativa na lista de recibos antes dos cálculos do relatório.
-- [ ] Atualizar o gráfico de rosca, cards de estátisticas, lista de categorias e lista de lojas para responderem à aba ativa.
-- [ ] Testar a alternância entre abas no Relatório e verificar se os totais recalculam com precisão.
+- [x] Renderizar a barra de pílulas de navegação por abas no topo de `renderReport()`.
+- [x] Aplicar o filtro da aba ativa na lista de recibos antes dos cálculos do relatório.
+- [x] Atualizar o gráfico de rosca, cards de estátisticas, lista de categorias e lista de lojas para responderem à aba ativa.
+- [x] Testar a alternância entre abas no Relatório e verificar se os totais recalculam com precisão.
