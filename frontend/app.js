@@ -54,7 +54,13 @@ const api = {
 // ══════════════════════════════════════════════════════════════════
 const AppState = {
   allReceipts: [],
-  appSettings: { him: 'Eu', her: 'Ela', password: '15112018', passwordHer: '', geminiKey: '', monthlyGoal: 0 },
+  appSettings: {
+    him: 'Eu', her: 'Ela', password: '15112018', passwordHer: '', geminiKey: '', monthlyGoal: 0,
+    goals: {
+      categories: { mercado: 0, restaurante: 0, transporte: 0, saude: 0, lazer: 0, moradia: 0, educacao: 0, roupas: 0, outros: 0 },
+      persons: { him: 0, her: 0 }
+    }
+  },
   loggedAs: sessionStorage.getItem('casal_logged_as') || null,
   currentFile: null,
   currentBase64: null,
@@ -116,6 +122,7 @@ window.showPage = function(id, desktopBtn, navId) {
     if (id === 'history') { window.populateCycleSelects(); window.renderHistory(); }
     if (id === 'report')  { window.populateCycleSelects(); window.renderReport(); }
     if (id === 'personal') { window.renderPersonalDashboard(); }
+    if (id === 'goals') { window.renderGoals(); }
   } catch (error) { console.error('Erro na navegação:', error); alert('Erro ao mudar de página: ' + error.message); }
 };
 
@@ -865,6 +872,149 @@ window.exportCSV = function() {
     a.href = url; a.download = `gastos_casal_${cycle}.csv`; a.click(); URL.revokeObjectURL(url);
     window.showToast('📥 CSV exportado!');
   } catch(e) { console.error(e); }
+};
+
+// ══════════════════════════════════════════════════════════════════
+//  TELA DE METAS DE ORÇAMENTO
+// ══════════════════════════════════════════════════════════════════
+const GOALS_CATEGORIES = [
+  { key: 'mercado', label: '🛒 Mercado' }, { key: 'restaurante', label: '🍽️ Restaurante' },
+  { key: 'transporte', label: '🚗 Transporte' }, { key: 'saude', label: '💊 Saúde' },
+  { key: 'lazer', label: '🎉 Lazer' }, { key: 'moradia', label: '🏠 Moradia' },
+  { key: 'educacao', label: '📚 Educação' }, { key: 'roupas', label: '👕 Roupas' },
+  { key: 'outros', label: '📦 Outros' }
+];
+
+function goalBar(spent, limit) {
+  if (!limit || limit === 0) return '';
+  const pct = Math.min(100, Math.round(spent / limit * 100));
+  const color = pct >= 100 ? 'var(--her)' : pct >= 80 ? '#f59e0b' : 'var(--both)';
+  const label = pct >= 100 ? '🔴 ESTOURADO' : pct >= 80 ? '🟡 Atenção' : '🟢';
+  return `
+    <div style="margin-top:0.5rem">
+      <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:0.3rem">
+        <span style="font-weight:600">${fmt(fromCents(spent))} / ${fmt(fromCents(limit))}</span>
+        <span style="color:${color};font-weight:700">${label} ${pct}%</span>
+      </div>
+      <div style="background:var(--card2);border-radius:99px;height:10px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${color};border-radius:99px;transition:width 0.6s ease"></div>
+      </div>
+    </div>`;
+}
+
+window.renderGoals = function() {
+  try {
+    const g = AppState.appSettings.goals || { categories: {}, persons: {} };
+    const names = getNames();
+
+    // ── Calcular gastos da fatura atual por categoria e por pessoa ──
+    const current = AppState.allReceipts.filter(r => !r.scope && r.type !== 'settlement' && (!r.cycle || r.cycle === 'current'));
+    const spentCat = {}; let spentHim = 0; let spentHer = 0;
+    current.forEach(r => {
+      const cat = r.category || 'outros';
+      const total = (r.himCents || 0) + (r.herCents || 0);
+      spentCat[cat] = (spentCat[cat] || 0) + total;
+      spentHim += r.himCents || 0;
+      spentHer += r.herCents || 0;
+    });
+
+    // ── Renderizar inputs de categoria ──
+    const catContainer = document.getElementById('goals-category-inputs');
+    if (catContainer) {
+      catContainer.innerHTML = GOALS_CATEGORIES.map(({ key, label }) => {
+        const limitCents = (g.categories || {})[key] || 0;
+        const limitVal = limitCents > 0 ? fromCents(limitCents).toFixed(2) : '';
+        return `<div style="margin-bottom:1rem">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem">
+            <span style="font-size:0.88rem;font-weight:600;min-width:120px">${label}</span>
+            <div style="display:flex;align-items:center;gap:0.4rem;flex:1">
+              <span style="font-size:0.8rem;color:var(--muted2)">R$</span>
+              <input class="field-input" type="number" step="0.01" min="0" placeholder="Sem limite"
+                value="${limitVal}" style="flex:1;padding:0.4rem 0.6rem;font-size:0.85rem"
+                oninput="window.updateGoalCategory('${key}', this.value)">
+            </div>
+          </div>
+          ${goalBar(spentCat[key] || 0, limitCents)}
+        </div>`;
+      }).join('');
+    }
+
+    // ── Renderizar inputs de pessoa ──
+    const personContainer = document.getElementById('goals-person-inputs');
+    if (personContainer) {
+      const limHim = (g.persons || {}).him || 0;
+      const limHer = (g.persons || {}).her || 0;
+      personContainer.innerHTML = `
+        <div style="margin-bottom:1rem">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem">
+            <span style="font-size:0.88rem;font-weight:600;min-width:120px;color:var(--him)">👤 ${names.him}</span>
+            <div style="display:flex;align-items:center;gap:0.4rem;flex:1">
+              <span style="font-size:0.8rem;color:var(--muted2)">R$</span>
+              <input class="field-input" type="number" step="0.01" min="0" placeholder="Sem limite"
+                value="${limHim > 0 ? fromCents(limHim).toFixed(2) : ''}" style="flex:1;padding:0.4rem 0.6rem;font-size:0.85rem"
+                oninput="window.updateGoalPerson('him', this.value)">
+            </div>
+          </div>
+          ${goalBar(spentHim, limHim)}
+        </div>
+        <div style="margin-bottom:0.5rem">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem">
+            <span style="font-size:0.88rem;font-weight:600;min-width:120px;color:var(--her)">👤 ${names.her}</span>
+            <div style="display:flex;align-items:center;gap:0.4rem;flex:1">
+              <span style="font-size:0.8rem;color:var(--muted2)">R$</span>
+              <input class="field-input" type="number" step="0.01" min="0" placeholder="Sem limite"
+                value="${limHer > 0 ? fromCents(limHer).toFixed(2) : ''}" style="flex:1;padding:0.4rem 0.6rem;font-size:0.85rem"
+                oninput="window.updateGoalPerson('her', this.value)">
+            </div>
+          </div>
+          ${goalBar(spentHer, limHer)}
+        </div>`;
+    }
+
+    // ── Renderizar progresso geral (só categorias com limite definido) ──
+    const progressContainer = document.getElementById('goals-progress-content');
+    if (progressContainer) {
+      const withLimit = GOALS_CATEGORIES.filter(c => ((g.categories || {})[c.key] || 0) > 0);
+      const himLimit = (g.persons || {}).him || 0;
+      const herLimit = (g.persons || {}).her || 0;
+      if (withLimit.length === 0 && himLimit === 0 && herLimit === 0) {
+        progressContainer.innerHTML = `<div class="empty"><p>Nenhuma meta definida ainda. Configure os limites acima para ver o progresso aqui.</p></div>`;
+        return;
+      }
+      let html = '';
+      if (withLimit.length > 0) {
+        html += '<div style="font-size:0.8rem;font-weight:700;color:var(--muted2);margin-bottom:0.75rem;text-transform:uppercase;letter-spacing:0.5px">Por Categoria</div>';
+        html += withLimit.map(({ key, label }) => {
+          const spent = spentCat[key] || 0;
+          const limit = (g.categories || {})[key] || 0;
+          return `<div style="margin-bottom:1rem"><div style="font-weight:700;font-size:0.88rem">${label}</div>${goalBar(spent, limit)}</div>`;
+        }).join('');
+      }
+      if (himLimit > 0 || herLimit > 0) {
+        html += '<div style="font-size:0.8rem;font-weight:700;color:var(--muted2);margin:1rem 0 0.75rem;text-transform:uppercase;letter-spacing:0.5px">Por Pessoa</div>';
+        if (himLimit > 0) html += `<div style="margin-bottom:1rem"><div style="font-weight:700;font-size:0.88rem;color:var(--him)">👤 ${names.him}</div>${goalBar(spentHim, himLimit)}</div>`;
+        if (herLimit > 0) html += `<div style="margin-bottom:0.5rem"><div style="font-weight:700;font-size:0.88rem;color:var(--her)">👤 ${names.her}</div>${goalBar(spentHer, herLimit)}</div>`;
+      }
+      progressContainer.innerHTML = html;
+    }
+  } catch (e) { console.error(e); }
+};
+
+let _goalSaveTimer = null;
+window.updateGoalCategory = function(key, value) {
+  if (!AppState.appSettings.goals) AppState.appSettings.goals = { categories: {}, persons: {} };
+  if (!AppState.appSettings.goals.categories) AppState.appSettings.goals.categories = {};
+  AppState.appSettings.goals.categories[key] = cents(value);
+  clearTimeout(_goalSaveTimer);
+  _goalSaveTimer = setTimeout(() => { saveSettingsToCloud(); window.renderGoals(); }, 800);
+};
+
+window.updateGoalPerson = function(who, value) {
+  if (!AppState.appSettings.goals) AppState.appSettings.goals = { categories: {}, persons: {} };
+  if (!AppState.appSettings.goals.persons) AppState.appSettings.goals.persons = {};
+  AppState.appSettings.goals.persons[who] = cents(value);
+  clearTimeout(_goalSaveTimer);
+  _goalSaveTimer = setTimeout(() => { saveSettingsToCloud(); window.renderGoals(); }, 800);
 };
 
 // ── BOOT ──

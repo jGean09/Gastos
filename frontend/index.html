@@ -58,6 +58,7 @@
           <button class="desktop-nav-btn" onclick="window.showPage('history',this,'nav-history')">Histórico</button>
           <button class="desktop-nav-btn" onclick="window.showPage('report',this,'nav-report')">Relatório</button>
           <button class="desktop-nav-btn" onclick="window.showPage('personal',this,'nav-personal')">Pessoal</button>
+          <button class="desktop-nav-btn" onclick="window.showPage('goals',this,'nav-goals')">🎯 Metas</button>
           <button class="desktop-nav-btn" onclick="window.showPage('settings',this,'nav-settings')">Config</button>
         </nav>
       </div>
@@ -289,6 +290,32 @@
       </div>
     </div>
 
+    <div id="page-goals" class="page">
+      <div class="page-title">🎯 Metas de Orçamento</div>
+      <div class="page-sub">Defina limites por categoria e por pessoa. As barras mostram o consumo da fatura atual.</div>
+
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-header">📂 Limite por Categoria (Casal)</div>
+        <div style="padding: 0.75rem 1.25rem 1.25rem">
+          <div id="goals-category-inputs"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-header">👤 Limite por Pessoa</div>
+        <div style="padding: 0.75rem 1.25rem 1.25rem">
+          <div id="goals-person-inputs"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-header">📊 Progresso da Fatura Atual</div>
+        <div id="goals-progress-content" style="padding: 0.5rem 1.25rem 1rem">
+          <div class="empty"><div class="empty-icon">⏳</div><p>Carregando...</p></div>
+        </div>
+      </div>
+    </div>
+
     <div id="page-settings" class="page">
       <div class="page-title">Configurações</div>
       <div class="page-sub">Dados salvos na nuvem — acessíveis em qualquer dispositivo.</div>
@@ -371,9 +398,9 @@
         <span class="nav-icon">👤</span>
         <span>Pessoal</span>
       </button>
-      <button class="nav-item" id="nav-settings" onclick="window.showPage('settings',null,'nav-settings')">
-        <span class="nav-icon">⚙️</span>
-        <span>Config</span>
+      <button class="nav-item" id="nav-goals" onclick="window.showPage('goals',null,'nav-goals')">
+        <span class="nav-icon">🎯</span>
+        <span>Metas</span>
       </button>
     </nav>
 
