@@ -378,7 +378,7 @@ window.openEditModal = function(fireId) {
     const receipt = AppState.allReceipts.find(r => r._fireId === fireId);
     if (!receipt) return;
     AppState.editingFireId = fireId;
-    AppState.editingItems = receipt.items.map(i => ({ ...i }));
+    AppState.editingItems = (receipt.items || []).map(i => ({ ...i }));
     document.getElementById('edit-store').value = receipt.store || '';
     document.getElementById('edit-date').value = receipt.date || today();
     document.getElementById('edit-method').value = receipt.method || '';
@@ -733,8 +733,8 @@ window.renderHistory = function() {
     let list = AppState.allReceipts.filter(r => !r.scope && r.type !== 'settlement');
     if (cycle === 'current') list = list.filter(r => !r.cycle || r.cycle === 'current');
     else list = list.filter(r => r.cycle === cycle);
-    if (person === 'him') list = list.filter(r => r.type === 'settlement' ? r.payer === 'him' : r.himCents > 0);
-    if (person === 'her') list = list.filter(r => r.type === 'settlement' ? r.payer === 'her' : r.herCents > 0);
+    if (person === 'him') list = list.filter(r => r.himCents > 0);
+    if (person === 'her') list = list.filter(r => r.herCents > 0);
     if (category) list = list.filter(r => r.type !== 'settlement' && (r.category || 'outros') === category);
     if (searchRaw) list = list.filter(r => { const storeMatch = (r.store || '').toLowerCase().includes(searchRaw); const itemMatch = r.items && r.items.some(i => (i.name || '').toLowerCase().includes(searchRaw)); return storeMatch || itemMatch; });
     list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));

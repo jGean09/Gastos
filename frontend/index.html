@@ -484,38 +484,7 @@
     </div>
   </div>
 
-  <div id="settle-modal" class="modal-overlay" onclick="if(event.target===this)window.closeSettleModal()">
-    <div class="modal-box">
-      <div class="modal-header">
-        <span>💸 Registrar Pagamento (Pix)</span>
-        <button class="modal-close" onclick="window.closeSettleModal()">✕</button>
-      </div>
-      <div class="modal-body">
-        <p style="font-size: 0.85rem; color: var(--muted2); margin-bottom: 1rem;">
-          Registre um adiantamento/pagamento parcial. Isso abaterá o valor do "Falta Pagar" da fatura atual sem fechar a
-          conta geral.
-        </p>
-        <div class="meta-grid">
-          <div style="grid-column: span 2;">
-            <label class="field-label">Quem está pagando?</label>
-            <select class="field-input" id="settle-payer"></select>
-          </div>
-          <div>
-            <label class="field-label">Valor do Pix (R$)</label>
-            <input class="field-input" type="number" step="0.01" min="0" id="settle-amount" placeholder="0,00">
-          </div>
-          <div>
-            <label class="field-label">Data</label>
-            <input class="field-input" type="date" id="settle-date">
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-ghost btn-sm" onclick="window.closeSettleModal()">Cancelar</button>
-        <button class="btn btn-success btn-sm" onclick="window.saveSettlement()">✅ Salvar Pagamento</button>
-      </div>
-    </div>
-  </div>
+
 
   <div id="close-cycle-modal" class="modal-overlay" onclick="if(event.target===this)window.closeCycleModal()">
     <div class="modal-box">
