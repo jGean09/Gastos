@@ -4,10 +4,10 @@
 
 **Blocked by:** 01 e 02 (depende da separação do tráfego entre fatura atual e mundo inteiro da API).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Criar a flag `AppState.historyLoaded = false` na inicialização do aplicativo.
-- [ ] No evento de clique da aba "Histórico" ou na função `showPage('history')`, se a flag for `false`, bloquear a renderização e exibir o Spinner de carregamento.
-- [ ] Chamar `api.getReceipts({ cycle: 'all' })` para o back-end.
-- [ ] Atualizar o `AppState.allReceipts` com o volume de dados total retornado pela API.
-- [ ] Alterar `historyLoaded` para `true` e chamar o `renderHistory()` finalizando o fluxo sem puxar da API nos próximos cliques dentro da mesma sessão.
+- [x] Criar a flag `AppState.historyLoaded = false` na inicialização do aplicativo.
+- [x] No evento de clique da aba "Histórico" ou na função `showPage('history')`, se a flag for `false`, bloquear a renderização e exibir o Spinner de carregamento.
+- [x] Chamar `api.getReceipts({ cycle: 'all' })` para o back-end.
+- [x] Atualizar o `AppState.allReceipts` com o volume de dados total retornado pela API.
+- [x] Alterar `historyLoaded` para `true` e chamar o `renderHistory()` finalizando o fluxo sem puxar da API nos próximos cliques dentro da mesma sessão.

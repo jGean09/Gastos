@@ -72,6 +72,7 @@ const AppState = {
   editingItems: [],
   historyTabFilter: 'couple',
   reportTabFilter: 'all',
+  historyLoaded: false,
 };
 
 // ── TRATAMENTO GLOBAL DE ERROS ──
@@ -131,7 +132,7 @@ window.switchTab = function(tab) {
   } catch (error) { console.error(error); }
 };
 
-window.showPage = function(id, desktopBtn, navId) {
+window.showPage = async function(id, desktopBtn, navId) {
   try {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById('page-' + id).classList.add('active');
@@ -139,8 +140,26 @@ window.showPage = function(id, desktopBtn, navId) {
     if (desktopBtn) desktopBtn.classList.add('active');
     document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
     if (navId) document.getElementById(navId)?.classList.add('active');
-    if (id === 'history') { window.populateCycleSelects(); window.renderHistory(); }
-    if (id === 'report')  { window.populateCycleSelects(); window.renderReport(); }
+    
+    if (id === 'history' || id === 'report') {
+      if (!AppState.historyLoaded) {
+        // Exibe um spinner temporário enquanto carrega
+        const containerId = id === 'history' ? 'history-list' : 'report-content';
+        const container = document.getElementById(containerId);
+        if (container) container.innerHTML = `<div class="empty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px"><div class="sync-bar-spinner" style="width:36px;height:36px;margin-bottom:1rem;border-width:4px"></div><p>Buscando histórico completo...</p></div>`;
+        
+        try {
+          const allData = await api.getReceipts('all');
+          AppState.allReceipts = allData;
+          AppState.historyLoaded = true;
+        } catch (e) {
+          window.showToast('❌ Erro ao buscar histórico antigo');
+        }
+      }
+      window.populateCycleSelects(); 
+      if (id === 'history') window.renderHistory();
+      if (id === 'report') window.renderReport();
+    }
     if (id === 'personal') { window.renderPersonalDashboard(); }
     if (id === 'goals') { window.renderGoals(); }
   } catch (error) { console.error('Erro na navegação:', error); alert('Erro ao mudar de página: ' + error.message); }
