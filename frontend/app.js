@@ -909,28 +909,49 @@ window.renderReport = function() {
     window.renderReportTabPills();
     const cycle = document.getElementById('report-cycle')?.value || 'current';
     const reportTab = AppState.reportTabFilter;
-    let list = AppState.allReceipts.filter(r => !r.scope);
-    if (cycle === 'current') list = list.filter(r => !r.cycle || r.cycle === 'current');
-    else list = list.filter(r => r.cycle === cycle);
-    // ── Filtragem por aba do relatório ──
-    if (reportTab === 'him')    list = list.filter(r => r.type === 'settlement' || ((r.himCents || 0) > 0 && (r.herCents || 0) === 0 && (r.otherCents || 0) === 0));
-    else if (reportTab === 'her')    list = list.filter(r => r.type === 'settlement' || ((r.herCents || 0) > 0 && (r.himCents || 0) === 0 && (r.otherCents || 0) === 0));
-    else if (reportTab === 'couple') list = list.filter(r => r.type === 'settlement' || ((r.himCents || 0) > 0 && (r.herCents || 0) > 0));
-    const container = document.getElementById('report-content');
-    const names = getNames();
+    let fullList = AppState.allReceipts.filter(r => !r.scope);
+    if (cycle === 'current') fullList = fullList.filter(r => !r.cycle || r.cycle === 'current');
+    else fullList = fullList.filter(r => r.cycle === cycle);
+
+    // ── Lista Completa: usada para o Acerto de Contas (Falta Pagar) e Dívidas de Terceiros ──
+    let runningBalanceCents = 0;
+    let globalHimC = 0; let globalHerC = 0;
+    fullList.forEach(r => {
+      if (r.type === 'settlement') {
+        if (r.payer === 'him') runningBalanceCents += r.amountCents;
+        else if (r.payer === 'her') runningBalanceCents -= r.amountCents;
+      } else if (r.status !== 'paid' && r.type !== 'rollover') {
+        const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0);
+        const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
+        if (r.payer === 'him') runningBalanceCents += rHerC;
+        else if (r.payer === 'her') runningBalanceCents -= rHimC;
+        globalHimC += rHimC; globalHerC += rHerC;
+      } else if (r.status === 'paid' && r.type !== 'rollover') {
+        const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0);
+        const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
+        globalHimC += rHimC; globalHerC += rHerC;
+      }
+    });
+    const globalCoupleC = globalHimC + globalHerC;
+
     let thirdPartyDebts = { him: {}, her: {} };
-    AppState.allReceipts.filter(r => !r.scope && r.status !== 'paid').forEach(r => {
+    fullList.filter(r => r.status !== 'paid').forEach(r => {
       if (r.payer === 'him') { if (r.items) r.items.filter(i => i.split === 'other' && !i.paid).forEach(i => { const n = i.otherName || 'Alguém'; thirdPartyDebts.him[n] = (thirdPartyDebts.him[n] || 0) + (i.priceCents || cents(i.price)); }); }
       else if (r.payer === 'her') { if (r.items) r.items.filter(i => i.split === 'other' && !i.paid).forEach(i => { const n = i.otherName || 'Alguém'; thirdPartyDebts.her[n] = (thirdPartyDebts.her[n] || 0) + (i.priceCents || cents(i.price)); }); }
     });
 
-    let runningBalanceCents = 0;
+    // ── Filtragem por aba do relatório (apenas para estatísticas, gráficos e listas) ──
+    let list = [...fullList];
+    if (reportTab === 'him')    list = list.filter(r => r.type === 'settlement' || ((r.himCents || 0) > 0 && (r.herCents || 0) === 0 && (r.otherCents || 0) === 0));
+    else if (reportTab === 'her')    list = list.filter(r => r.type === 'settlement' || ((r.herCents || 0) > 0 && (r.himCents || 0) === 0 && (r.otherCents || 0) === 0));
+    else if (reportTab === 'couple') list = list.filter(r => r.type === 'settlement' || ((r.himCents || 0) > 0 && (r.herCents || 0) > 0));
+
+    const container = document.getElementById('report-content');
+    const names = getNames();
+
     let himC = 0, herC = 0, otherC = 0; const storeMap = {}; const categoryMap = {};
     list.forEach(r => {
-      if (r.type === 'settlement') {
-        if (r.payer === 'him') runningBalanceCents += r.amountCents;
-        else if (r.payer === 'her') runningBalanceCents -= r.amountCents;
-      } else {
+      if (r.type !== 'settlement') {
         const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0);
         const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0);
         const rOtherC = r.otherCents !== undefined ? r.otherCents : cents(r.otherTotal || 0);
@@ -944,13 +965,9 @@ window.renderReport = function() {
           categoryMap[cat].him += rHimC;
           categoryMap[cat].her += rHerC;
         }
-        if (r.status !== 'paid') {
-          if (r.payer === 'him') runningBalanceCents += rHerC;
-          else if (r.payer === 'her') runningBalanceCents -= rHimC;
-        }
       }
     });
-    let settlementsHTML = ''; let settlements = list.filter(r => r.type === 'settlement');
+    let settlementsHTML = ''; let settlements = fullList.filter(r => r.type === 'settlement');
     if (settlements.length > 0) {
       let sRows = settlements.map(s => { const payerName = s.payer === 'him' ? names.him : names.her; const dStr = new Date(s.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }); return `<div class="store-row" style="border-left: 3px solid var(--both); padding-left:0.75rem;"><div style="flex:1"><div style="font-weight:700">Adiantamento / Pix de ${payerName}</div><div style="font-size:0.7rem; color:var(--muted2);">${dStr}</div></div><div style="text-align:right"><div style="color:var(--both); font-weight:800">+ ${fmt(fromCents(s.amountCents))}</div><button class="btn-ghost" style="border:none; padding:0.2rem; font-size:0.7rem; color:var(--muted); margin-top:0.25rem;" onclick="window.deleteReceipt('${s._fireId}')">Apagar Pix</button></div></div>`; }).join('');
       settlementsHTML = `<div class="card" style="margin-bottom:1rem; border-color:var(--both);"><div class="card-header" style="color:var(--both)">💸 Pagamentos Parciais (Já Realizados)</div><div style="padding:0.75rem 1.25rem 1rem 1.25rem;">${sRows}</div></div>`;
@@ -970,9 +987,9 @@ window.renderReport = function() {
     if (hasDebts) { thirdPartyHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--other)"><div class="card-header" style="color:var(--other)">👥 A Receber de Terceiros (Em Aberto)</div><div style="padding:0 1.25rem">${debtsRows}</div></div>`; }
     let goalHTML = '';
     if (AppState.appSettings.monthlyGoal > 0) {
-      const pct = Math.min(100, Math.round(coupleC / AppState.appSettings.monthlyGoal * 100));
+      const pct = Math.min(100, Math.round(globalCoupleC / AppState.appSettings.monthlyGoal * 100));
       const color = pct >= 100 ? 'var(--her)' : pct >= 80 ? 'var(--other)' : 'var(--both)';
-      goalHTML = `<div class="card" style="margin-bottom:1rem"><div class="card-header">🎯 Meta da Fatura</div><div class="goal-bar-wrap"><div class="goal-bar-labels"><span>${fmt(fromCents(coupleC))} gastos</span><span style="color:${color};font-weight:800">${pct}%</span></div><div class="goal-bar-track"><div class="goal-bar-fill" style="width:${pct}%;background:${color}"></div></div><div style="font-size:0.72rem;color:var(--muted2);margin-top:0.4rem">Meta: ${fmt(fromCents(AppState.appSettings.monthlyGoal))}</div></div></div>`;
+      goalHTML = `<div class="card" style="margin-bottom:1rem"><div class="card-header">🎯 Meta da Fatura</div><div class="goal-bar-wrap"><div class="goal-bar-labels"><span>${fmt(fromCents(globalCoupleC))} gastos</span><span style="color:${color};font-weight:800">${pct}%</span></div><div class="goal-bar-track"><div class="goal-bar-fill" style="width:${pct}%;background:${color}"></div></div><div style="font-size:0.72rem;color:var(--muted2);margin-top:0.4rem">Meta: ${fmt(fromCents(AppState.appSettings.monthlyGoal))}</div></div></div>`;
     }
     const statsHTML = `<div class="stat-grid" style="margin-bottom:1rem"><div class="stat-card"><div class="stat-label">${names.him} consumiu</div><div class="stat-value" style="color:var(--him)">${fmt(fromCents(himC))}</div></div><div class="stat-card"><div class="stat-label">${names.her} consumiu</div><div class="stat-value" style="color:var(--her)">${fmt(fromCents(herC))}</div></div><div class="stat-card"><div class="stat-label">Total do casal</div><div class="stat-value" style="color:var(--both)">${fmt(fromCents(coupleC))}</div></div>${otherC > 0 ? `<div class="stat-card"><div class="stat-label">Terceiros</div><div class="stat-value" style="color:var(--other)">${fmt(fromCents(otherC))}</div></div>` : `<div class="stat-card"><div class="stat-label">Contas</div><div class="stat-value">${listGastos.length}</div></div>`}</div>`;
     const donutSegs = [{ value: himC, color: 'var(--him)', label: names.him, val: fmt(fromCents(himC)) }, { value: herC, color: 'var(--her)', label: names.her, val: fmt(fromCents(herC)) }];
