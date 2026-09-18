@@ -1315,4 +1315,46 @@ body {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
-
+
+/* ── Interface Otimista (Ticket 03) ── */
+.receipt-failed {
+  border: 1px solid rgba(239, 68, 68, 0.4) !important;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.1);
+}
+.receipt-sync-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+.btn-retry {
+  background: rgba(239, 68, 68, 0.2);
+  border: none;
+  color: #fca5a5;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-xs);
+  font-weight: 700;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.btn-retry:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+.receipt-sync-pending {
+  background: rgba(52, 211, 153, 0.05);
+  color: var(--both);
+  padding: 0.35rem 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-bottom: 1px solid rgba(52, 211, 153, 0.1);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}

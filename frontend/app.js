@@ -268,19 +268,63 @@ async function loadReceipts() {
   } catch (error) { console.error(error); }
 }
 
+/**
+ * Otimistic UI: injeta o gasto na lista imediatamente (ID temp_) e
+ * sincroniza em background. Em caso de falha de rede, marca _syncStatus='failed'
+ * para o usuário poder tentar novamente sem perder os dados.
+ */
 async function addReceiptToCloud(receipt) {
+  // Injeta com ID temporário na memória e atualiza a tela
+  const tempId = 'temp_' + Date.now();
+  const optimisticReceipt = { ...receipt, _fireId: tempId, _syncStatus: 'pending' };
+  AppState.allReceipts.unshift(optimisticReceipt);
+  AppState.allReceipts.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   setSyncStatus('syncing');
+
   try {
     const saved = await api.addReceipt(receipt);
-    AppState.allReceipts.unshift(saved);
-    AppState.allReceipts.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    // Substitui o item temporário pelo salvo com _fireId real
+    const idx = AppState.allReceipts.findIndex(r => r._fireId === tempId);
+    if (idx !== -1) AppState.allReceipts[idx] = { ...saved, _syncStatus: undefined };
     _writeLocalCache(AppState.allReceipts);
     setSyncStatus('ok');
     return true;
   } catch(e) {
-    setSyncStatus('err'); window.showToast('❌ Erro ao salvar: ' + e.message); return false;
+    // Marca como falha e guarda o payload original para reenvio
+    const idx = AppState.allReceipts.findIndex(r => r._fireId === tempId);
+    if (idx !== -1) {
+      AppState.allReceipts[idx]._syncStatus = 'failed';
+      AppState.allReceipts[idx]._retryPayload = receipt;
+    }
+    setSyncStatus('err');
+    window.renderHistory(); // re-renderiza para mostrar o badge de erro
+    return false;
   }
 }
+
+/** Tenta novamente enviar um gasto que falhou. Chamado pelo botão "Tentar Novamente". */
+window.retryReceipt = async function(tempId) {
+  const item = AppState.allReceipts.find(r => r._fireId === tempId);
+  if (!item || !item._retryPayload) return;
+  item._syncStatus = 'pending';
+  window.renderHistory();
+  setSyncStatus('syncing');
+  try {
+    const saved = await api.addReceipt(item._retryPayload);
+    const idx = AppState.allReceipts.findIndex(r => r._fireId === tempId);
+    if (idx !== -1) AppState.allReceipts[idx] = { ...saved, _syncStatus: undefined };
+    _writeLocalCache(AppState.allReceipts);
+    setSyncStatus('ok');
+    window.renderHistory();
+    window.showToast('✅ Gasto sincronizado com sucesso!');
+  } catch(e) {
+    const idx = AppState.allReceipts.findIndex(r => r._fireId === tempId);
+    if (idx !== -1) AppState.allReceipts[idx]._syncStatus = 'failed';
+    setSyncStatus('err');
+    window.renderHistory();
+    window.showToast('❌ Ainda sem conexão. Tente mais tarde.');
+  }
+};
 
 window.deleteReceipt = async function(fireId) {
   if (!confirm('Tem certeza que deseja apagar?')) return;
@@ -646,17 +690,19 @@ window.saveQuickExpense = async function() {
       items: [item], himCents: himC, herCents: herC, otherCents: otherC, coupleCents: himC + herC, totalCents: himC + herC + otherC,
       imageBase64: null, imageMime: null, names: { him: names.him, her: names.her }, createdAt: Date.now()
     };
-    const ok = await addReceiptToCloud(receipt);
-    if (ok) {
-      window.showToast('✅ Salvo!');
-      document.getElementById('quick-desc').value = ''; document.getElementById('quick-price').value = '';
-      document.getElementById('quick-date').value = today();
-      if (document.getElementById('quick-method')) document.getElementById('quick-method').value = '';
-      document.getElementById('quick-other-name').value = '';
-      document.getElementById('quick-other-div').style.display = 'none';
-      document.getElementById('quick-split').value = 'both'; document.getElementById('quick-category').value = 'outros';
+
+    // Optimistic: limpa o form e atualiza a tela ANTES de aguardar o servidor
+    document.getElementById('quick-desc').value = ''; document.getElementById('quick-price').value = '';
+    document.getElementById('quick-date').value = today();
+    if (document.getElementById('quick-method')) document.getElementById('quick-method').value = '';
+    document.getElementById('quick-other-name').value = '';
+    document.getElementById('quick-other-div').style.display = 'none';
+    document.getElementById('quick-split').value = 'both'; document.getElementById('quick-category').value = 'outros';
+    window.showToast('✅ Salvo!');
+
+    addReceiptToCloud(receipt).then(() => {
       window.populateCycleSelects(); window.renderHistory();
-    }
+    });
   } catch (error) { console.error(error); } finally { AppState.isSaving = false; }
 };
 
@@ -896,7 +942,19 @@ window.renderHistory = function() {
         return `<div class="receipt-item-row"><span style="flex:1">${item.name}</span><span class="item-badge">${badgeLabel}</span><span style="font-weight:700;color:var(--both)">${fmt(fromCents(iC))}</span></div>`;
       }).join('');
       const imgSrc = r.imageBase64 ? `data:${r.imageMime || 'image/jpeg'};base64,${r.imageBase64}` : '';
-      return `<div class="receipt-card" style="${isPaid ? 'opacity:0.72;' : ''}animation-delay:${idx * 0.04}s">
+      
+      // Optimistic UI: banner de erro para gastos não sincronizados
+      const isFailed = r._syncStatus === 'failed';
+      const isPending = r._syncStatus === 'pending';
+      const syncBanner = isFailed
+        ? `<div class="receipt-sync-error">
+            <span>⚠️ Falha ao salvar. Verifique sua conexão.</span>
+            <button class="btn-retry" onclick="window.retryReceipt('${fid}')">↻ Tentar Novamente</button>
+           </div>`
+        : isPending ? `<div class="receipt-sync-pending"><span class="sync-bar-spinner" style="width:10px;height:10px;border-width:1.5px"></span> Salvando...</div>` : '';
+
+      return `<div class="receipt-card ${isFailed ? 'receipt-failed' : ''}" style="${isPaid ? 'opacity:0.72;' : ''}animation-delay:${idx * 0.04}s">
+        ${syncBanner}
         <div class="receipt-head" onclick="window.toggleCard('${fid}')">
           <div style="min-width:0">
             <div class="receipt-store">${r.store} ${statusBadge}</div>
