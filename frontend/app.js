@@ -1022,7 +1022,11 @@ window.renderReport = function() {
       }).join('');
     const receiptRows = [...listGastos].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(r => { const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0); const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0); const d = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }); return `<div class="store-row" style="${r.status === 'paid' ? 'opacity:0.6' : ''}"><span>${d} — ${r.store} <span class="category-badge">${catLabel(r.category || 'outros')}</span></span><div class="store-amounts"><span style="color:var(--him)">${fmt(fromCents(rHimC))}</span><span style="color:var(--her)">${fmt(fromCents(rHerC))}</span></div></div>`; }).join('');
     const exportBtn = `<div style="margin-bottom:1rem;display:flex;justify-content:flex-end"><button class="btn btn-ghost btn-sm" onclick="window.exportCSV()">📥 Exportar CSV desta Fatura</button></div>`;
-    container.innerHTML = `${finalHTML}${settlementsHTML}${thirdPartyHTML}${goalHTML}${statsHTML}${donutHTML}${categoryHTML}<div class="card" style="margin-bottom:1rem"><div class="card-header">🏪 Onde vocês mais gastaram</div><div style="padding:0 1.25rem">${storeRows}</div></div><div class="card" style="margin-bottom:1rem"><div class="card-header">🧾 ${listGastos.length} contas na fatura</div><div style="padding:0 1.25rem">${receiptRows}</div></div>${exportBtn}`;
+    let topStoreTitle = '🏪 Onde vocês mais gastaram';
+    if (reportTab === 'him') topStoreTitle = `🏪 Onde ${names.him} mais gastou`;
+    else if (reportTab === 'her') topStoreTitle = `🏪 Onde ${names.her} mais gastou`;
+    else if (reportTab === 'all') topStoreTitle = '🏪 Onde mais foi gasto';
+    container.innerHTML = `${finalHTML}${settlementsHTML}${thirdPartyHTML}${goalHTML}${statsHTML}${donutHTML}${categoryHTML}<div class="card" style="margin-bottom:1rem"><div class="card-header">${topStoreTitle}</div><div style="padding:0 1.25rem">${storeRows}</div></div><div class="card" style="margin-bottom:1rem"><div class="card-header">🧾 ${listGastos.length} contas na fatura</div><div style="padding:0 1.25rem">${receiptRows}</div></div>${exportBtn}`;
   } catch (error) { console.error(error); }
 };
 
