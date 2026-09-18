@@ -994,21 +994,14 @@ window.renderReport = function() {
         </div>`; 
     }).join('');
     const categoryHTML = grandC > 0 ? `<div class="card" style="margin-bottom:1rem"><div class="card-header">📂 Gastos por categoria</div><div style="padding:0.5rem 1.25rem">${catRows}</div></div>` : '';
-    const storeRows = Object.entries(storeMap)
-      .sort((a, b) => (b[1].himC + b[1].herC) - (a[1].himC + a[1].herC))
-      .slice(0, 8)
-      .map(([store, v]) => {
-        const total = v.himC + v.herC;
-        // dot color: azul se só ele pagou, rosa se só ela, roxo se ambos
-        const dotColor = v.himC > 0 && v.herC === 0 ? 'var(--him)'
-                       : v.herC > 0 && v.himC === 0 ? 'var(--her)'
-                       : 'var(--both)';
-        const dotTitle = v.himC > 0 && v.herC === 0 ? names.him
-                       : v.herC > 0 && v.himC === 0 ? names.her
-                       : names.him + ' & ' + names.her;
+    const allStores = Object.entries(storeMap).sort((a, b) => (b[1].himC + b[1].herC) - (a[1].himC + a[1].herC));
+    const renderStoreSubList = (listArr, title, icon) => {
+      if (!listArr.length) return '';
+      const rows = listArr.slice(0, 8).map(([store, v]) => {
+        const dotColor = v.himC > 0 && v.herC === 0 ? 'var(--him)' : v.herC > 0 && v.himC === 0 ? 'var(--her)' : 'var(--both)';
         return `<div class="store-row" style="align-items:flex-start;gap:0.6rem">
           <div style="display:flex;align-items:flex-start;gap:0.5rem;flex:1;min-width:0">
-            <div style="width:10px;height:10px;border-radius:50%;background:${dotColor};flex-shrink:0;margin-top:0.3rem" title="${dotTitle}"></div>
+            <div style="width:10px;height:10px;border-radius:50%;background:${dotColor};flex-shrink:0;margin-top:0.3rem"></div>
             <div style="min-width:0">
               <div class="store-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${store}</div>
               <div style="font-size:0.68rem;color:var(--muted2);margin-top:0.1rem">${catLabel(v.category)}</div>
@@ -1020,6 +1013,14 @@ window.renderReport = function() {
           </div>
         </div>`;
       }).join('');
+      return `<div style="margin-top:1.2rem;margin-bottom:0.6rem;font-size:0.75rem;font-weight:800;color:var(--muted2);text-transform:uppercase;letter-spacing:0.5px">${icon} ${title}</div>${rows}`;
+    };
+
+    const storeRows = (
+      renderStoreSubList(allStores.filter(x => x[1].himC > 0 && x[1].herC > 0), 'Casal', '👩‍❤️‍👨') +
+      renderStoreSubList(allStores.filter(x => x[1].himC > 0 && x[1].herC === 0), names.him, '🔵') +
+      renderStoreSubList(allStores.filter(x => x[1].herC > 0 && x[1].himC === 0), names.her, '🔴')
+    ) || '<div style="padding:1rem 0;color:var(--muted);text-align:center;font-size:0.9rem">Nenhum gasto registrado.</div>';
     const receiptRows = [...listGastos].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(r => { const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0); const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0); const d = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }); return `<div class="store-row" style="${r.status === 'paid' ? 'opacity:0.6' : ''}"><span>${d} — ${r.store} <span class="category-badge">${catLabel(r.category || 'outros')}</span></span><div class="store-amounts"><span style="color:var(--him)">${fmt(fromCents(rHimC))}</span><span style="color:var(--her)">${fmt(fromCents(rHerC))}</span></div></div>`; }).join('');
     const exportBtn = `<div style="margin-bottom:1rem;display:flex;justify-content:flex-end"><button class="btn btn-ghost btn-sm" onclick="window.exportCSV()">📥 Exportar CSV desta Fatura</button></div>`;
     let topStoreTitle = '🏪 Onde vocês mais gastaram';
