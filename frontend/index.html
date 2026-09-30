@@ -30,14 +30,29 @@
           <div id="login-profile-hint" class="login-profile-hint" style="display:none"></div>
         </div>
       </div>
-      <div class="login-field-wrap">
-        <span class="login-field-icon">🔒</span>
-        <input type="password" id="senha-input" class="login-input" placeholder="Senha de acesso"
-          autocomplete="current-password">
+      <div id="password-step-wrap">
+        <div class="login-field-wrap">
+          <span class="login-field-icon">🔒</span>
+          <input type="password" id="senha-input" class="login-input" placeholder="Senha de acesso"
+            autocomplete="current-password">
+        </div>
       </div>
-      <button class="login-btn" onclick="window.verificarSenha()">
-        <span>Entrar</span>
+      <div id="mfa-step-wrap" style="display:none">
+        <p style="font-size:0.8rem;color:var(--muted2);margin-bottom:0.6rem;text-align:center">
+          Digite o código de 6 dígitos do seu autenticador:
+        </p>
+        <div class="login-field-wrap">
+          <span class="login-field-icon">📱</span>
+          <input type="text" id="mfa-code-input" class="login-input" placeholder="Código 2FA (6 dígitos)"
+            maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+        </div>
+      </div>
+      <button class="login-btn" id="login-submit-btn" onclick="window.verificarSenha()">
+        <span id="login-btn-text">Entrar</span>
         <span class="login-btn-arrow">→</span>
+      </button>
+      <button class="btn btn-ghost btn-sm" id="login-btn-back" style="display:none;margin-top:0.6rem;width:100%" onclick="window.resetLoginForm()">
+        ← Voltar para senha
       </button>
       <p id="login-erro" class="login-erro">Senha incorreta! Tente novamente.</p>
     </div>
@@ -362,22 +377,49 @@
       </div>
 
       <div class="card" style="margin-bottom:1rem">
-        <div class="card-header">🔒 Segurança — Senhas de Acesso</div>
+        <div class="card-header">🔒 Segurança — Alterar Senha</div>
         <div class="settings-row" style="display:block">
-          <label class="field-label">Sua senha (acesso principal)</label>
-          <input class="settings-input" type="password" id="new-password" placeholder="Nova senha sua..."
+          <label class="field-label">Senha atual</label>
+          <input class="settings-input" type="password" id="curr-password" placeholder="Digite sua senha atual..."
             style="margin-top:0.4rem">
-          <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" onclick="window.changePassword()">Alterar
-            minha senha</button>
         </div>
         <div class="settings-row" style="display:block">
-          <label class="field-label">Senha da Parceira(o)</label>
-          <input class="settings-input" type="password" id="new-password-her" placeholder="Nova senha dela/dele..."
+          <label class="field-label">Nova senha (mínimo 6 caracteres)</label>
+          <input class="settings-input" type="password" id="new-password" placeholder="Nova senha..."
             style="margin-top:0.4rem">
-          <p style="font-size:0.72rem;color:var(--muted2);margin-top:0.3rem">Quem entrar com esta senha vai diretamente
-            para o painel pessoal dela/dele.</p>
-          <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" onclick="window.changePasswordHer()">Alterar
-            senha dela/dele</button>
+          <button class="btn btn-primary btn-sm" style="margin-top:0.6rem" onclick="window.changeUserPassword()">Salvar
+            nova senha</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-header">🛡️ Autenticação em 2 Fatores (MFA / 2FA)</div>
+        <div class="settings-row" style="display:block">
+          <p style="font-size:0.8rem;color:var(--muted2);margin-bottom:0.6rem">
+            Adicione uma camada extra de proteção com o Google Authenticator ou Authy.
+          </p>
+          <div id="mfa-status-badge" style="margin-bottom:0.75rem">
+            <span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:rgba(255,255,255,0.08);color:var(--muted2)">Verificando...</span>
+          </div>
+          <div id="mfa-actions">
+            <button class="btn btn-primary btn-sm" id="btn-setup-mfa" onclick="window.startMfaSetup()">Configurar 2FA</button>
+            <button class="btn btn-danger btn-sm" id="btn-disable-mfa" style="display:none" onclick="window.promptDisableMfa()">Desativar 2FA</button>
+          </div>
+          <div id="mfa-setup-box" style="display:none;margin-top:1rem;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:1.2rem">
+            <p style="font-size:0.82rem;font-weight:600;margin-bottom:0.6rem">1. Escaneie este QR Code no seu aplicativo autenticador:</p>
+            <div style="text-align:center;margin:0.8rem 0">
+              <img id="mfa-qr-image" src="" alt="QR Code 2FA" style="max-width:180px;border-radius:12px;background:#fff;padding:8px;box-shadow:0 4px 16px rgba(0,0,0,0.4)">
+            </div>
+            <p style="font-size:0.75rem;color:var(--muted2);word-break:break-all;margin-bottom:0.8rem">
+              Chave manual: <strong id="mfa-secret-text" style="color:var(--him);font-family:monospace;letter-spacing:1px"></strong>
+            </p>
+            <p style="font-size:0.82rem;font-weight:600;margin-bottom:0.4rem">2. Digite o código de 6 dígitos gerado:</p>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+              <input type="text" id="mfa-verify-input" class="settings-input" placeholder="000000" maxlength="6" inputmode="numeric" style="max-width:140px">
+              <button class="btn btn-primary btn-sm" onclick="window.confirmMfaSetup()">Confirmar e Ativar</button>
+              <button class="btn btn-ghost btn-sm" onclick="window.cancelMfaSetup()">Cancelar</button>
+            </div>
+          </div>
         </div>
       </div>
 

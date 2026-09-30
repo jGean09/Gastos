@@ -147,11 +147,21 @@ class ExpenseService {
 
   async getSettings() {
     const data = await configRepo.load();
-    return data || { him: 'Eu', her: 'Ela', password: '15112018', passwordHer: '', geminiKey: '', monthlyGoal: 0 };
+    const settings = data || { him: 'Eu', her: 'Ela', geminiKey: '', monthlyGoal: 0 };
+    // NUNCA vaza campos sensíveis como senhas ou segredos MFA
+    const safeSettings = { ...settings };
+    delete safeSettings.password;
+    delete safeSettings.passwordHer;
+    delete safeSettings.mfaSecret;
+    return safeSettings;
   }
 
   async saveSettings(settings) {
-    return configRepo.save(settings);
+    const safeSettings = { ...settings };
+    delete safeSettings.password;
+    delete safeSettings.passwordHer;
+    delete safeSettings.mfaSecret;
+    return configRepo.save(safeSettings);
   }
 }
 

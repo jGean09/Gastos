@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
+const authRoutes = require('./routes/authRoutes');
 const routes = require('./routes/expenseRoutes');
 
 const app = express();
@@ -21,6 +22,7 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' })); // Limite aumentado para suportar imagens base64
 
 // ── Rotas da API ──
+app.use('/api/auth', authRoutes);
 app.use('/api', routes);
 
 // ── Health check (Render usa isso para saber se o servidor está de pé) ──

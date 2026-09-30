@@ -20,12 +20,31 @@ const API_BASE_URL = window.API_BASE_URL || 'http://localhost:3000/api';
 //  apenas chama métodos simples como api.getReceipts().
 // ══════════════════════════════════════════════════════════════════
 const api = {
-  async request(method, path, body = null) {
+  async request(method, path, body = null, isRetry = false) {
     setSyncStatus('syncing');
     try {
-      const opts = { method, headers: { 'Content-Type': 'application/json' } };
+      const token = localStorage.getItem('casal_token');
+      const opts = {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      };
       if (body) opts.body = JSON.stringify(body);
       const res = await fetch(API_BASE_URL + path, opts);
+
+      // Renovação automática caso o Access Token tenha expirado (HTTP 401)
+      if (res.status === 401 && !isRetry && !path.startsWith('/auth/login') && !path.startsWith('/auth/refresh') && !path.startsWith('/auth/logout')) {
+        const refreshed = await api.refreshToken();
+        if (refreshed) {
+          return api.request(method, path, body, true);
+        } else {
+          window.logout();
+          throw new Error('Sessão expirada. Faça login novamente.');
+        }
+      }
+
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText }));
         throw new Error(err.error || 'Erro desconhecido');
@@ -37,6 +56,39 @@ const api = {
       throw e;
     }
   },
+
+  // ── Endpoints de Autenticação & Sessão ──
+  login:          (data)     => api.request('POST', '/auth/login', data),
+  verifyMfaLogin: (data)     => api.request('POST', '/auth/login/mfa', data),
+  getMe:          ()         => api.request('GET',  '/auth/me'),
+  setupMfa:       ()         => api.request('POST', '/auth/mfa/setup'),
+  verifyMfa:      (data)     => api.request('POST', '/auth/mfa/verify', data),
+  disableMfa:     (data)     => api.request('POST', '/auth/mfa/disable', data),
+  changePassword: (data)     => api.request('POST', '/auth/change-password', data),
+  logout:         (data)     => api.request('POST', '/auth/logout', data),
+
+  async refreshToken() {
+    try {
+      const rt = localStorage.getItem('casal_refresh_token');
+      if (!rt) return false;
+      const res = await fetch(API_BASE_URL + '/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: rt }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (data.accessToken) {
+        localStorage.setItem('casal_token', data.accessToken);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  },
+
+  // ── Endpoints de Negócio ──
   getReceipts:     (cycle)    => api.request('GET',    cycle ? `/receipts?cycle=${cycle}` : '/receipts'),
   addReceipt:      (data)     => api.request('POST',   '/receipts', data),
   deleteReceipt:   (id)       => api.request('DELETE', `/receipts/${id}`),
@@ -182,40 +234,129 @@ window.updatePayerSelect = function() {
   } catch (error) { console.error(error); }
 };
 
-// ── LOGIN ──
-window.verificarSenha = function() {
+// ── LOGIN COM SENHA HASH E MFA ──
+AppState._tempMfaToken = null;
+
+window.resetLoginForm = function() {
+  AppState._tempMfaToken = null;
+  const pwWrap = document.getElementById('password-step-wrap');
+  const mfaWrap = document.getElementById('mfa-step-wrap');
+  const backBtn = document.getElementById('login-btn-back');
+  const btnText = document.getElementById('login-btn-text');
+  const erroMsg = document.getElementById('login-erro');
+  if (pwWrap) pwWrap.style.display = 'block';
+  if (mfaWrap) mfaWrap.style.display = 'none';
+  if (backBtn) backBtn.style.display = 'none';
+  if (btnText) btnText.textContent = 'Entrar';
+  if (erroMsg) erroMsg.style.display = 'none';
+  const senhaInput = document.getElementById('senha-input');
+  if (senhaInput) { senhaInput.value = ''; senhaInput.focus(); }
+};
+
+window.verificarSenha = async function() {
+  const erroMsg = document.getElementById('login-erro');
+  const submitBtn = document.getElementById('login-submit-btn');
+
   try {
-    const inputEl = document.getElementById('senha-input');
-    const erroMsg = document.getElementById('login-erro');
-    if (!inputEl || !erroMsg) return;
-    const input = inputEl.value;
-    if (!input) { erroMsg.style.display = 'block'; erroMsg.textContent = 'Digite a senha!'; return; }
-    if (AppState.appSettings.passwordHer && input === AppState.appSettings.passwordHer) {
-      erroMsg.style.display = 'none'; AppState.loggedAs = 'her';
-      sessionStorage.setItem('casal_logged_as', 'her'); localStorage.setItem('casal_auth', 'ok'); liberarAcesso();
-    } else if (input === AppState.appSettings.password) {
-      erroMsg.style.display = 'none'; AppState.loggedAs = 'him';
-      sessionStorage.setItem('casal_logged_as', 'him'); localStorage.setItem('casal_auth', 'ok'); liberarAcesso();
-    } else {
-      erroMsg.style.display = 'block'; erroMsg.textContent = 'Senha incorreta! Tente novamente.';
-      inputEl.classList.add('shake'); setTimeout(() => inputEl.classList.remove('shake'), 500);
+    // ── Etapa 2: Código MFA ──
+    if (AppState._tempMfaToken) {
+      const mfaInput = document.getElementById('mfa-code-input');
+      const mfaCode = mfaInput ? mfaInput.value.trim() : '';
+      if (!mfaCode || mfaCode.length < 6) {
+        erroMsg.style.display = 'block';
+        erroMsg.textContent = 'Digite o código de 6 dígitos!';
+        if (mfaInput) { mfaInput.classList.add('shake'); setTimeout(() => mfaInput.classList.remove('shake'), 500); }
+        return;
+      }
+
+      if (submitBtn) submitBtn.disabled = true;
+      const res = await api.verifyMfaLogin({ tempToken: AppState._tempMfaToken, mfaCode });
+      localStorage.setItem('casal_token', res.accessToken);
+      localStorage.setItem('casal_refresh_token', res.refreshToken);
+      localStorage.setItem('casal_auth', 'ok');
+      sessionStorage.setItem('casal_logged_as', res.user.who);
+      AppState.loggedAs = res.user.who;
+      erroMsg.style.display = 'none';
+      liberarAcesso();
+      return;
     }
-  } catch (error) { console.error(error); }
+
+    // ── Etapa 1: Senha de Acesso ──
+    const inputEl = document.getElementById('senha-input');
+    if (!inputEl) return;
+    const password = inputEl.value;
+    if (!password) {
+      erroMsg.style.display = 'block';
+      erroMsg.textContent = 'Digite a senha!';
+      return;
+    }
+
+    if (submitBtn) submitBtn.disabled = true;
+    const res = await api.login({ password });
+
+    if (res.mfaRequired) {
+      AppState._tempMfaToken = res.tempToken;
+      const pwWrap = document.getElementById('password-step-wrap');
+      const mfaWrap = document.getElementById('mfa-step-wrap');
+      const backBtn = document.getElementById('login-btn-back');
+      const btnText = document.getElementById('login-btn-text');
+      if (pwWrap) pwWrap.style.display = 'none';
+      if (mfaWrap) mfaWrap.style.display = 'block';
+      if (backBtn) backBtn.style.display = 'block';
+      if (btnText) btnText.textContent = 'Verificar Código';
+      erroMsg.style.display = 'none';
+      const mfaInput = document.getElementById('mfa-code-input');
+      if (mfaInput) { mfaInput.value = ''; mfaInput.focus(); }
+    } else {
+      localStorage.setItem('casal_token', res.accessToken);
+      localStorage.setItem('casal_refresh_token', res.refreshToken);
+      localStorage.setItem('casal_auth', 'ok');
+      sessionStorage.setItem('casal_logged_as', res.user.who);
+      AppState.loggedAs = res.user.who;
+      erroMsg.style.display = 'none';
+      liberarAcesso();
+    }
+  } catch (error) {
+    erroMsg.style.display = 'block';
+    erroMsg.textContent = error.message || 'Senha incorreta! Tente novamente.';
+    const inputEl = AppState._tempMfaToken
+      ? document.getElementById('mfa-code-input')
+      : document.getElementById('senha-input');
+    if (inputEl) {
+      inputEl.classList.add('shake');
+      setTimeout(() => inputEl.classList.remove('shake'), 500);
+    }
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
 };
 
 function liberarAcesso() {
   try {
     const loginScreen = document.getElementById('login-screen');
-    loginScreen.style.opacity = '0'; loginScreen.style.transition = 'opacity 0.4s ease';
+    loginScreen.style.opacity = '0';
+    loginScreen.style.transition = 'opacity 0.4s ease';
     setTimeout(() => { loginScreen.style.display = 'none'; }, 400);
     document.getElementById('app-content').style.display = 'block';
     initApp();
-  } catch (error) { console.error(error); }
+  } catch (error) {
+    console.error(error);
+  }
 }
 
-window.logout = function() {
-  localStorage.removeItem('casal_auth'); sessionStorage.removeItem('casal_logged_as');
-  AppState.loggedAs = null; location.reload();
+window.logout = async function() {
+  try {
+    const rt = localStorage.getItem('casal_refresh_token');
+    // Revoga o refresh token no backend para que não possa ser reutilizado
+    if (rt) await api.logout({ refreshToken: rt }).catch(() => {});
+  } finally {
+    localStorage.removeItem('casal_token');
+    localStorage.removeItem('casal_refresh_token');
+    localStorage.removeItem('casal_auth');
+    sessionStorage.removeItem('casal_logged_as');
+    AppState.loggedAs = null;
+    location.reload();
+  }
 };
 
 // ── CARREGAR DADOS DA API ──
@@ -628,15 +769,42 @@ window.saveEditModal = async function() {
 // ── BOOT E INIT ──
 async function checkAuthAndBoot() {
   try {
-    await loadSettings();
     const senhaInput = document.getElementById('senha-input');
-    if (senhaInput) senhaInput.addEventListener('keydown', e => { if (e.key === 'Enter') window.verificarSenha(); });
-    if (localStorage.getItem('casal_auth') === 'ok') liberarAcesso();
-  } catch (error) { console.error('Erro no boot:', error); }
+    if (senhaInput) {
+      senhaInput.addEventListener('keydown', e => { if (e.key === 'Enter') window.verificarSenha(); });
+    }
+    const mfaInput = document.getElementById('mfa-code-input');
+    if (mfaInput) {
+      mfaInput.addEventListener('keydown', e => { if (e.key === 'Enter') window.verificarSenha(); });
+    }
+
+    const token = localStorage.getItem('casal_token');
+    if (token) {
+      try {
+        const me = await api.getMe();
+        if (me && me.user) {
+          AppState.loggedAs = me.user.who;
+          sessionStorage.setItem('casal_logged_as', me.user.who);
+          liberarAcesso();
+          return;
+        }
+      } catch {
+        const refreshed = await api.refreshToken();
+        if (refreshed) {
+          liberarAcesso();
+          return;
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Erro no boot:', error);
+  }
 }
 
 async function initApp() {
   try {
+    await loadSettings();
+    window.loadMfaStatus();
     document.getElementById('api-key-input').value = AppState.appSettings.geminiKey || '';
     document.getElementById('api-key-settings').value = AppState.appSettings.geminiKey || '';
     document.getElementById('name-him').value = AppState.appSettings.him;
@@ -730,13 +898,111 @@ window.saveApiKey = function() { AppState.appSettings.geminiKey = document.getEl
 window.saveApiKeySettings = function() { AppState.appSettings.geminiKey = document.getElementById('api-key-settings').value.trim(); document.getElementById('api-key-input').value = AppState.appSettings.geminiKey; saveSettingsToCloud(); };
 window.saveNames = function() { AppState.appSettings.him = document.getElementById('name-him').value || 'Eu'; AppState.appSettings.her = document.getElementById('name-her').value || 'Ela'; window.updatePayerSelect(); saveSettingsToCloud(); };
 window.saveGoal = function() { AppState.appSettings.monthlyGoal = cents(document.getElementById('monthly-goal').value); saveSettingsToCloud(); };
-window.changePassword = function() { const np = document.getElementById('new-password').value.trim(); if (!np) return; AppState.appSettings.password = np; saveSettingsToCloud(); document.getElementById('new-password').value = ''; window.showToast('✅ Sua senha foi alterada!'); };
-window.changePasswordHer = function() {
-  const np = document.getElementById('new-password-her')?.value.trim();
-  if (!np) { window.showToast('⚠️ Digite a nova senha dela!'); return; }
-  AppState.appSettings.passwordHer = np; saveSettingsToCloud();
-  document.getElementById('new-password-her').value = '';
-  window.showToast('✅ Senha dela alterada! Agora ela pode fazer login.');
+// ── GERENCIAMENTO DE SENHA E MFA ──
+window.changeUserPassword = async function() {
+  const currEl = document.getElementById('curr-password');
+  const newEl = document.getElementById('new-password');
+  const curr = currEl ? currEl.value.trim() : '';
+  const next = newEl ? newEl.value.trim() : '';
+
+  if (!next || next.length < 6) {
+    window.showToast('⚠️ A nova senha deve ter no mínimo 6 caracteres.');
+    return;
+  }
+
+  try {
+    const res = await api.changePassword({ currentPassword: curr, newPassword: next });
+    if (currEl) currEl.value = '';
+    if (newEl) newEl.value = '';
+    window.showToast('✅ ' + (res.message || 'Senha alterada com sucesso!'));
+  } catch (err) {
+    window.showToast('❌ ' + (err.message || 'Erro ao alterar senha.'));
+  }
+};
+
+window.loadMfaStatus = async function() {
+  try {
+    const badge = document.getElementById('mfa-status-badge');
+    const btnSetup = document.getElementById('btn-setup-mfa');
+    const btnDisable = document.getElementById('btn-disable-mfa');
+    if (!badge) return;
+
+    const me = await api.getMe();
+    const isMfaActive = me && me.user && me.user.mfaEnabled;
+
+    if (isMfaActive) {
+      badge.innerHTML = '<span style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:rgba(52,211,153,0.15);color:#34d399;border:1px solid rgba(52,211,153,0.3)">🔒 2FA Ativo e Protegido</span>';
+      if (btnSetup) btnSetup.style.display = 'none';
+      if (btnDisable) btnDisable.style.display = 'inline-block';
+    } else {
+      badge.innerHTML = '<span style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;background:rgba(255,255,255,0.08);color:var(--muted2)">⚠️ 2FA Desativado</span>';
+      if (btnSetup) btnSetup.style.display = 'inline-block';
+      if (btnDisable) btnDisable.style.display = 'none';
+    }
+  } catch (e) {
+    console.warn('Erro ao carregar status do MFA:', e);
+  }
+};
+
+// Segredo TOTP temporário isolado em escopo de módulo — não fica exposto em AppState/window
+let _pendingMfaSecret = null;
+
+window.startMfaSetup = async function() {
+  try {
+    const res = await api.setupMfa();
+    _pendingMfaSecret = res.secret;
+
+    const qrImg = document.getElementById('mfa-qr-image');
+    const secretText = document.getElementById('mfa-secret-text');
+    const setupBox = document.getElementById('mfa-setup-box');
+
+    if (qrImg) qrImg.src = res.qrCodeDataUrl;
+    if (secretText) secretText.textContent = res.secret;
+    if (setupBox) setupBox.style.display = 'block';
+
+    const verifyInput = document.getElementById('mfa-verify-input');
+    if (verifyInput) { verifyInput.value = ''; verifyInput.focus(); }
+  } catch (err) {
+    window.showToast('❌ ' + (err.message || 'Erro ao gerar QR Code MFA.'));
+  }
+};
+
+window.confirmMfaSetup = async function() {
+  const verifyInput = document.getElementById('mfa-verify-input');
+  const code = verifyInput ? verifyInput.value.trim() : '';
+
+  if (!code || code.length < 6) {
+    window.showToast('⚠️ Digite o código de 6 dígitos gerado no app.');
+    return;
+  }
+
+  try {
+    const res = await api.verifyMfa({ secret: _pendingMfaSecret, token: code });
+    window.showToast('✅ ' + (res.message || 'MFA ativado com sucesso!'));
+    window.cancelMfaSetup();
+    window.loadMfaStatus();
+  } catch (err) {
+    window.showToast('❌ ' + (err.message || 'Código incorreto. Tente novamente.'));
+  }
+};
+
+window.cancelMfaSetup = function() {
+  _pendingMfaSecret = null;
+  const setupBox = document.getElementById('mfa-setup-box');
+  if (setupBox) setupBox.style.display = 'none';
+};
+
+window.promptDisableMfa = async function() {
+  const password = prompt('Para desativar a Autenticação em 2 Fatores, confirme sua senha atual:');
+  if (!password) return;
+
+  try {
+    const res = await api.disableMfa({ password });
+    window.showToast('✅ ' + (res.message || 'MFA desativado.'));
+    window.loadMfaStatus();
+  } catch (err) {
+    window.showToast('❌ ' + (err.message || 'Erro ao desativar MFA.'));
+  }
 };
 
 window.clearAllData = async function() {
