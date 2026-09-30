@@ -7,6 +7,9 @@ const routes = require('./routes/expenseRoutes');
 
 const app = express();
 
+// Permite obter o IP real do cliente atrás de proxies reversos (Render, Cloudflare, Firebase)
+app.set('trust proxy', 1);
+
 // ── Middlewares ──
 const ALLOWED_ORIGINS = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',')
