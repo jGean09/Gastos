@@ -100,4 +100,6 @@ class ConfigRepository {
 module.exports = {
   receiptRepo: new ReceiptRepository(),
   configRepo: new ConfigRepository(),
+  // Exportado apenas para testes unitários do DTO (não deve ser usado fora de testes)
+  toReceiptDTO_TEST: toReceiptDTO,
 };

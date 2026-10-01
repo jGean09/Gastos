@@ -13,13 +13,16 @@ const xss = require('xss');
 /**
  * Opções restritivas: bloqueia TODAS as tags HTML.
  * Qualquer `<script>`, `<img onerror=...>`, `<a href="javascript:...">`, etc.
- * será escapado para texto puro antes de chegar ao Firestore.
+ * será removido antes de chegar ao Firestore.
+ *
+ * - whiteList: {}           → nenhuma tag é permitida
+ * - stripIgnoreTag: true    → remove tags não permitidas (em vez de escapar)
+ * - stripIgnoreTagBody      → remove também o CONTEÚDO de <script> e <style>
  */
 const STRICT_OPTIONS = {
-  whiteList: {},          // Nenhuma tag permitida
-  escapeHtml: true,       // Escapa <, >, &, " para entidades HTML
-  stripIgnoreTag: true,   // Remove tags não permitidas (não apenas escapa)
-  stripIgnoreTagBody: ['script', 'style'], // Também remove o conteúdo interno de <script> e <style>
+  whiteList: {},
+  stripIgnoreTag: true,
+  stripIgnoreTagBody: ['script', 'style'],
 };
 
 /**
