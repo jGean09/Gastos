@@ -3,6 +3,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 const { corsOptions } = require('./config/cors');
+const { enforceHttps, securityHeaders } = require('./middlewares/securityHeadersMiddleware');
 const authRoutes = require('./routes/authRoutes');
 const routes = require('./routes/expenseRoutes');
 
@@ -12,6 +13,8 @@ const app = express();
 app.set('trust proxy', 1);
 
 // ── Middlewares de Segurança e Parsing ──
+app.use(enforceHttps); // Redirecionamento 301 para HTTPS em produção
+app.use(securityHeaders); // Injeta cabeçalhos HSTS, Anti-Clickjacking, Anti-Sniffing e oculta X-Powered-By
 app.use(cors(corsOptions)); // CORS Estrito: autoriza apenas origens pré-aprovadas
 app.use(express.json({ limit: '10mb' })); // Limite para suportar imagens base64
 
