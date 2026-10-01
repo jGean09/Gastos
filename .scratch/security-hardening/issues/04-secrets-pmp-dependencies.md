@@ -33,15 +33,15 @@ Estabelecer governança sobre credenciais de acesso, privilégios de execução 
 
 **Blocked by:** None (pode ser iniciado imediatamente).
 
-**Status:** ready-for-agent
+**Status:** done
 
 ---
 
 ## Acceptance Criteria:
 
-- [ ] `.gitignore` consolidado na raiz do projeto garantindo que nenhum `.env`, `*.pem`, `*.json` de credencial possa ser adicionado ao git.
-- [ ] `.env.example` documentado com todas as variáveis requeridas e seus formatos.
-- [ ] O boot da aplicação valida a presença e integridade de todas as variáveis de ambiente essenciais.
-- [ ] Guia de configuração do IAM do GCP com permissões mínimas (`roles/datastore.user`) documentado.
-- [ ] Script de auditoria de vulnerabilidades (`npm run audit`) configurado no `package.json`.
-- [ ] Arquivo de automação `.github/dependabot.yml` configurado para monitoramento de CVEs.
+- [x] `.gitignore` consolidado na raiz do projeto garantindo que nenhum `.env`, `*.pem`, `*.json` de credencial possa ser adicionado ao git.
+- [x] `.env.example` documentado com todas as variáveis requeridas e seus formatos.
+- [x] O boot da aplicação valida a presença e integridade de todas as variáveis de ambiente essenciais.
+- [x] Guia de configuração do IAM do GCP com permissões mínimas (`roles/datastore.user`) documentado em `docs/IAM_LEAST_PRIVILEGE.md`.
+- [x] Script de auditoria de vulnerabilidades (`npm run audit`) configurado no `package.json`.
+- [x] Arquivo de automação `.github/dependabot.yml` configurado para monitoramento de CVEs.
