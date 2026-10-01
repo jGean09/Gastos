@@ -1,12 +1,26 @@
 const authService = require('../services/AuthService');
+const { logAudit } = require('../services/AuditService');
 
 class AuthController {
   async login(req, res) {
+    const { who } = req.body || {};
     try {
-      const { who, password, mfaCode } = req.body;
+      const { password, mfaCode } = req.body;
       const result = await authService.login({ who, password, mfaCode });
+      await logAudit('AUTH_LOGIN_SUCCESS', {
+        actor: who || 'unknown',
+        ip: req.ip,
+        status: 'SUCCESS',
+        details: { requiresMfa: !!result.requiresMfa },
+      });
       res.json(result);
     } catch (e) {
+      await logAudit('AUTH_LOGIN_FAILURE', {
+        actor: who || 'unknown',
+        ip: req.ip,
+        status: 'FAILED',
+        details: { error: e.message },
+      });
       res.status(401).json({ error: e.message });
     }
   }
@@ -15,8 +29,19 @@ class AuthController {
     try {
       const { tempToken, mfaCode } = req.body;
       const result = await authService.verifyMfaLogin({ tempToken, mfaCode });
+      await logAudit('AUTH_MFA_LOGIN_SUCCESS', {
+        actor: result.who || 'mfa_user',
+        ip: req.ip,
+        status: 'SUCCESS',
+      });
       res.json(result);
     } catch (e) {
+      await logAudit('AUTH_MFA_LOGIN_FAILURE', {
+        actor: 'mfa_user',
+        ip: req.ip,
+        status: 'FAILED',
+        details: { error: e.message },
+      });
       res.status(401).json({ error: e.message });
     }
   }
