@@ -46,7 +46,7 @@ Estabelecer a resiliência de longo prazo dos dados financeiros do casal, garant
 
 **Blocked by:** Phase 03 / Phase 04
 
-**Status:** ready-for-agent
+**Status:** ready
 
 ---
 

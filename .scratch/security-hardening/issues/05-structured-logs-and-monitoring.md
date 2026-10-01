@@ -44,7 +44,7 @@ Implementar observabilidade completa na aplicação, permitindo detecção preco
 
 **Blocked by:** Phase 01 / Phase 02
 
-**Status:** ready-for-agent
+**Status:** ready
 
 ---
 
