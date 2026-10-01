@@ -33,7 +33,7 @@ Estabelecer governança sobre credenciais de acesso, privilégios de execução 
 
 **Blocked by:** None (pode ser iniciado imediatamente).
 
-**Status:** ready-for-agent
+**Status:** ready
 
 ---
 

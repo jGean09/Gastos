@@ -9,7 +9,7 @@
 
 ## What to build:
 
-Garantir que nenhum dado não confiável originado da interface ou de agentes externos possa corromper o banco de dados Firestore, executar scripts maliciosos (Stored XSS) ou explorar comportamentos anômalos no backend.
+Garantir que nenhum dado não confiável originado da interface ou de sistemas externos possa corromper o banco de dados Firestore, executar scripts maliciosos (Stored XSS) ou explorar comportamentos anômalos no backend.
 
 ### Componentes Chave:
 1. **Validação Estrita de Esquemas com Zod:**
@@ -39,7 +39,7 @@ Garantir que nenhum dado não confiável originado da interface ou de agentes ex
 
 **Blocked by:** Phase 01 / Phase 02 (pode ser iniciado assim que os esquemas de rotas forem definidos).
 
-**Status:** ready-for-agent
+**Status:** ready
 
 ---
 
