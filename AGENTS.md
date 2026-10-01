@@ -23,20 +23,35 @@ Single-context layout: one `CONTEXT.md` at the repo root plus `docs/adr/`. See `
 - *Se uma tarefa gerar múltiplas unidades lógicas* (ex: criar hook + criar componente + integrar na página), separar em múltiplos checkpoints de commit propostos, um por vez, em vez de propor um único commit no final cobrindo tudo.
 - *Nunca fazer git push* sem confirmação explícita do usuário, mesmo após o commit ser aprovado.
 
-## Fluxo de Trabalho no GitHub
+## Issues e PRs: sempre direto no GitHub
 
-Para qualquer funcionalidade nova ou correção, seguir sempre esta ordem. O erro mais comum é programar primeiro e organizar depois: planejar antes de escrever qualquer linha de código.
+Issues, Pull Requests e labels vivem **no GitHub (jGean09/Gastos)**, não no repositório local.
 
-```
-[Criar Issue] ➔ [Criar Branch] ➔ [Programar/Commit] ➔ [Push] ➔ [Abrir PR linkado à Issue] ➔ [Merge]
-```
+- *Nunca criar issues como arquivos locais* (nada de `.scratch/`, `docs/issues/`, `TODO.md`, markdown de "issue" dentro do repo ou qualquer tracker local). Isso vale também para specs e tickets gerados por skills: publicar como Issue no GitHub.
+- *Usar o GitHub CLI (`gh`)* para operar direto no GitHub: `gh issue create`, `gh issue list`, `gh issue view`, `gh issue edit` (labels), `gh pr create`, `gh pr view`, `gh pr list`. Se o `gh` não estiver instalado ou autenticado, avisar o usuário em vez de improvisar um substituto local.
+- *Antes de criar* uma Issue ou PR, apresentar ao usuário o título, a descrição (e as labels, se for Issue) e aguardar aprovação. Só depois rodar o comando `gh`.
+- *Consultar o GitHub antes de assumir estado:* para saber se já existe Issue, qual o número dela ou se um PR já foi mesclado, usar `gh` em vez de deduzir pelo histórico local.
+- *Todo PR deve vincular a Issue* com `Closes #N` ou `Fixes #N` na descrição.
+- *O agente nunca faz merge de PR por conta própria.* Essa etapa é do usuário.
 
-1. *Criar a Issue (planejamento)*: antes de programar, garantir que existe uma Issue descrevendo o objetivo da funcionalidade ou do bug. Se não existir, propor ao usuário o título e a descrição da Issue e aguardar confirmação antes de seguir.
-2. *Criar uma branch (ambiente seguro)*: a partir da `main` atualizada, criar uma branch nova para o trabalho. *Nunca programar direto na `main`.* Usar o número da issue no nome da branch, com prefixo do tipo de trabalho (ex: `feature/ajuste-login-12`, `fix/calculo-media-15` ou `issue-12-nova-funcionalidade`).
-3. *Programar e fazer commits (o trabalho)*: desenvolver na branch criada, com commits pequenos, atômicos e em Conventional Commits, sempre respeitando a "Regra de Commits" acima (propor, aguardar aprovação, só então commitar).
-4. *Enviar para o GitHub (push)*: ao terminar, enviar a branch com `git push origin nome-da-branch`, *somente após confirmação explícita do usuário*.
-5. *Abrir o Pull Request e vincular à Issue (revisão)*: abrir o PR da branch para a `main` e, na descrição, incluir uma palavra-chave de fechamento com o número da issue (ex: `Closes #12` ou `Fixes #12`). Assim o GitHub linka os dois e fecha a Issue automaticamente quando o PR for mesclado. Propor o título e a descrição do PR ao usuário antes de abri-lo.
-6. *Fazer o merge (finalização)*: depois que o código for revisado e aprovado (pelo usuário ou por colegas), o merge do PR joga a funcionalidade na `main`. *O agente nunca faz merge por conta própria*; essa etapa é do usuário.
+### Ordem para qualquer funcionalidade ou correção
+
+[Issue no GitHub] ➔ [Branch] ➔ [Programar/Commit] ➔ [Push] ➔ [PR linkado à Issue] ➔ [Merge pelo usuário]
+
+1. *Issue:* garantir que existe uma Issue no GitHub descrevendo o objetivo. Se não existir, propor título e descrição e, com aprovação, criar com `gh issue create`.
+2. *Branch:* criar a partir da `main` atualizada (`git pull` antes), com o número da issue no nome e prefixo do tipo de trabalho (ex: `feature/ajuste-login-12`, `fix/calculo-media-15`, `issue-12-nova-funcionalidade`). Nunca programar direto na `main`.
+3. *Programar e commitar:* seguir a "Regra de Commits" acima.
+4. *Push:* `git push origin nome-da-branch`, somente com confirmação explícita.
+5. *PR:* abrir com `gh pr create` (base `main`), com `Closes #N` na descrição.
+6. *Merge:* feito pelo usuário.
+
+### Quando o PR anterior ainda não foi mesclado
+
+Se a próxima tarefa começar enquanto o PR da anterior ainda está aberto:
+
+- Se a nova tarefa *não depende* do código do PR aberto, criar a branch a partir da `main` atual e avisar o usuário que o PR anterior continua pendente.
+- Se *depende* do código do PR aberto, parar e perguntar ao usuário se espera o merge ou se parte da branch do PR anterior.
+- Em nenhum caso decidir isso sozinho em silêncio, nem fazer merge para destravar.
 
 ## Skills de Engenharia (mattpocock/skills)
 
@@ -80,3 +95,4 @@ Se o relato vier incompleto, pedir: (1) o que o usuário fez, passo a passo; (2)
 ### Setup
 
 Se as skills ainda não estiverem configuradas neste repo, rodar `/setup-matt-pocock-skills` uma vez (tracker: GitHub Issues; labels: as de "Triage labels"; docs: layout de "Domain docs").
+
