@@ -5,7 +5,7 @@ Restrict API access to authorized frontend domains via a configurable `CORS_ORIG
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Update `server.js` to read allowed CORS origins from `process.env.CORS_ORIGIN`
 - [x] Update `cors` middleware to validate the request origin against the allowlist (defaulting to localhost)

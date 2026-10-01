@@ -5,7 +5,7 @@ Simplify the `renderHistory` filter logic in `app.js` by removing impossible `r.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Remove the ternary `r.type === 'settlement'` condition in the `him` and `her` filters inside `renderHistory`
 - [x] Verify that the History view correctly filters by person (Só meus / Só dela)

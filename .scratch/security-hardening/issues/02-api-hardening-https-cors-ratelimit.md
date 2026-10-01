@@ -42,15 +42,15 @@ Fortalecer a camada de rede e transporte da API Express e do Frontend estático,
 
 **Blocked by:** None (pode ser executado em paralelo com a Fase 1).
 
-**Status:** ready-for-agent
+**Status:** done
 
 ---
 
 ## Acceptance Criteria:
 
-- [ ] Pacotes `helmet` e `express-rate-limit` instalados e configurados em `Gastos/backend`.
-- [ ] Requisições com métodos HTTP inválidos ou com headers perigosos são rejeitadas com status adequado.
-- [ ] Rate limit disparado após ultrapassar o teto estipulado, devolvendo HTTP 429 com mensagem explicativa em JSON.
-- [ ] Origens não autorizadas são bloqueadas pelo CORS com erro amigável e sem vazamento de stacktrace.
-- [ ] Headers de segurança HSTS e No-Sniff validados via verificação de headers de resposta.
-- [ ] Dados sensíveis criptografados em repouso com algoritmo padrão da indústria (AES-256-GCM).
+- [x] Pacotes `helmet` e `express-rate-limit` instalados e configurados em `Gastos/backend`.
+- [x] Requisições com métodos HTTP inválidos ou com headers perigosos são rejeitadas com status adequado.
+- [x] Rate limit disparado após ultrapassar o teto estipulado, devolvendo HTTP 429 com mensagem explicativa em JSON.
+- [x] Origens não autorizadas são bloqueadas pelo CORS com erro amigável e sem vazamento de stacktrace.
+- [x] Headers de segurança HSTS e No-Sniff validados via verificação de headers de resposta.
+- [x] Dados sensíveis criptografados em repouso com algoritmo padrão da indústria (AES-256-GCM).

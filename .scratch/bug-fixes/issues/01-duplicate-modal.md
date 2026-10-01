@@ -5,7 +5,7 @@ Restore full functionality to the "Registrar Pix / Acerto Avulso" modal by remov
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Remove the second `div` with `id="settle-modal"` in `index.html`
 - [x] Verify that the "Registrar Pix" modal opens when clicked
