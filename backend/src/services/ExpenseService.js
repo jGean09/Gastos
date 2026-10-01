@@ -12,6 +12,7 @@
  * regra de negócio financeira da aplicação.
  */
 const { receiptRepo, configRepo } = require('../repositories/ExpenseRepository');
+const { sanitizeReceipt } = require('../utils/sanitize');
 
 // ── Strategy: calcula centavos a partir de um valor decimal ──
 function cents(v) { return Math.round((parseFloat(v) || 0) * 100); }
@@ -50,9 +51,10 @@ class ExpenseService {
   async addReceipt(data) {
     // Validação básica (Single Responsibility: validar antes de persistir)
     if (!data.store && !data.type) throw new Error('Dados inválidos para o recibo.');
-    data.createdAt = data.createdAt || Date.now();
+    // Sanitização anti-XSS: limpa campos de texto livre antes de persistir
+    const clean = sanitizeReceipt({ ...data, createdAt: data.createdAt || Date.now() });
     _cache.clear(); // invalida cache após escrita
-    return receiptRepo.create(data);
+    return receiptRepo.create(clean);
   }
 
   async deleteReceipt(id) {
@@ -69,8 +71,10 @@ class ExpenseService {
 
   async updateReceipt(id, updates) {
     if (!id) throw new Error('ID inválido.');
+    // Sanitização anti-XSS: limpa campos de texto livre antes de atualizar
+    const cleanUpdates = sanitizeReceipt(updates);
     _cache.clear(); // invalida cache após escrita
-    return receiptRepo.updateFields(id, updates);
+    return receiptRepo.updateFields(id, cleanUpdates);
   }
 
   async clearAllReceipts() {
