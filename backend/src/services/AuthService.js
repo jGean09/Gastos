@@ -4,6 +4,7 @@ const speakeasy = require('speakeasy');
 const QRCode = require('qrcode');
 const authRepo = require('../repositories/AuthRepository');
 const { JWT_SECRET, JWT_EXPIRATION, REFRESH_TOKEN_EXPIRATION } = require('../config/jwt');
+const { encrypt, decrypt } = require('../utils/crypto');
 
 class AuthService {
   /**
@@ -59,8 +60,9 @@ class AuthService {
         };
       }
 
+      const plainSecret = decrypt(matchedProfile.mfaSecret);
       const verified = speakeasy.totp.verify({
-        secret: matchedProfile.mfaSecret,
+        secret: plainSecret,
         encoding: 'base32',
         token: mfaCode.trim(),
         window: 1, // Tolera 30s de dessincronização de relógio
@@ -98,8 +100,9 @@ class AuthService {
       throw new Error('MFA não configurado para este usuário.');
     }
 
+    const plainSecret = decrypt(profile.mfaSecret);
     const verified = speakeasy.totp.verify({
-      secret: profile.mfaSecret,
+      secret: plainSecret,
       encoding: 'base32',
       token: mfaCode.trim(),
       window: 1,
@@ -224,8 +227,11 @@ class AuthService {
       throw new Error('Código de confirmação inválido. Tente novamente.');
     }
 
+    // Criptografa o segredo TOTP em repouso com AES-256-GCM antes de persistir
+    const encryptedSecret = encrypt(secret);
+
     await authRepo.updateProfile(who, {
-      mfaSecret: secret,
+      mfaSecret: encryptedSecret,
       mfaEnabled: true,
     });
 
