@@ -5,7 +5,7 @@ Allow users to tap the edit button on settlements, rollovers, and personal-panel
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Add a `|| []` fallback for `receipt.items` in `openEditModal` inside `app.js`
 - [x] Ensure that clicking edit on a settlement or rollover opens the modal successfully with an empty item list
