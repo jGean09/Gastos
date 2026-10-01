@@ -39,14 +39,14 @@ Garantir que nenhum dado não confiável originado da interface ou de sistemas e
 
 **Blocked by:** Phase 01 / Phase 02 (pode ser iniciado assim que os esquemas de rotas forem definidos).
 
-**Status:** ready
+**Status:** done
 
 ---
 
 ## Acceptance Criteria:
 
-- [ ] Biblioteca `zod` integrada com middleware de validação genérico `validateRequest({ body, query, params })`.
-- [ ] Validação ativa para todas as rotas de criação, atualização e exclusão em `ExpenseController`.
-- [ ] Testes de envio de payloads maliciosos (strings com scripts `<script>alert(1)</script>`, números negativos, campos com prototype pollution) são bloqueados com erro 400/422.
-- [ ] Repositórios desacoplados de `req.body` com uso obrigatório de DTOs mapeados.
-- [ ] Frontend sanitiza e escapa todo texto renderizado dinamicamente em tabelas e cards de recibos.
+- [x] Biblioteca `zod` integrada com middleware de validação genérico `validateRequest({ body, query, params })`.
+- [x] Validação ativa para todas as rotas de criação, atualização e exclusão em `ExpenseController`.
+- [x] Testes de envio de payloads maliciosos (strings com scripts `<script>alert(1)</script>`, números negativos, campos com prototype pollution) são bloqueados com erro 400/422.
+- [x] Repositórios desacoplados de `req.body` com uso obrigatório de DTOs mapeados.
+- [x] Frontend sanitiza e escapa todo texto renderizado dinamicamente em tabelas e cards de recibos.
