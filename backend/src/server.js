@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 
+const { corsOptions } = require('./config/cors');
 const authRoutes = require('./routes/authRoutes');
 const routes = require('./routes/expenseRoutes');
 
@@ -10,19 +11,9 @@ const app = express();
 // Permite obter o IP real do cliente atrás de proxies reversos (Render, Cloudflare, Firebase)
 app.set('trust proxy', 1);
 
-// ── Middlewares ──
-const ALLOWED_ORIGINS = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(',')
-  : ['http://localhost:3000', 'http://localhost:5500', 'http://127.0.0.1:5500'];
-
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (e.g. curl, Render health-check, same-origin)
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-    callback(new Error(`CORS: origin ${origin} not allowed`));
-  },
-})); // Permite requisições do Frontend autorizado
-app.use(express.json({ limit: '10mb' })); // Limite aumentado para suportar imagens base64
+// ── Middlewares de Segurança e Parsing ──
+app.use(cors(corsOptions)); // CORS Estrito: autoriza apenas origens pré-aprovadas
+app.use(express.json({ limit: '10mb' })); // Limite para suportar imagens base64
 
 // ── Rotas da API ──
 app.use('/api/auth', authRoutes);
@@ -31,6 +22,17 @@ app.use('/api', routes);
 // ── Health check (Render usa isso para saber se o servidor está de pé) ──
 app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'API Gastos Casal rodando 🚀' });
+});
+
+// ── Tratamento Global de Erros de CORS e Requisições Bloqueadas ──
+app.use((err, req, res, next) => {
+  if (err && (err.code === 'CORS_NOT_ALLOWED' || err.message?.includes('CORS'))) {
+    return res.status(403).json({
+      error: err.message || 'Origem não permitida pela política de segurança (CORS).',
+      code: 'CORS_FORBIDDEN',
+    });
+  }
+  next(err);
 });
 
 const PORT = process.env.PORT || 3000;
