@@ -137,6 +137,15 @@ function fromCents(c) { return c / 100; }
 function fmt(v) { return 'R$ ' + fromCents(cents(v)).toFixed(2).replace('.', ','); }
 function today() { return new Date().toISOString().split('T')[0]; }
 function getNames() { return { him: AppState.appSettings.him || 'Eu', her: AppState.appSettings.her || 'Ela' }; }
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 // ── Migra limites antigos de categorias (número → {him, her}) ──
 function normalizeCategoryLimits(categories) {
@@ -820,7 +829,7 @@ async function initApp() {
       const pName = AppState.loggedAs === 'him' ? names.him : names.her;
       const pColor = AppState.loggedAs === 'him' ? 'var(--him)' : 'var(--her)';
       profileBadge.style.display = 'flex'; profileBadge.style.borderColor = pColor;
-      profileBadge.innerHTML = `<span style="color:${pColor};font-weight:700;font-size:0.78rem">👤 ${pName.split(' ')[0]}</span>`;
+      profileBadge.innerHTML = `<span style="color:${pColor};font-weight:700;font-size:0.78rem">👤 ${escapeHtml(pName.split(' ')[0])}</span>`;
     }
     const ownerSel = document.getElementById('personal-owner');
     const ownerLabel = document.getElementById('personal-owner-label');
@@ -1087,13 +1096,13 @@ window.renderProducts = function() {
   const names = getNames(); const list = document.getElementById('products-list'); list.innerHTML = '';
   AppState.currentProducts.forEach(item => {
     const div = document.createElement('div'); div.className = 'product-item';
-    const otherInput = item.split === 'other' ? `<input class="other-input" placeholder="Pessoa..." value="${item.otherName || ''}" oninput="window.setOtherName(${item.id}, this.value)">` : '';
+    const otherInput = item.split === 'other' ? `<input class="other-input" placeholder="Pessoa..." value="${escapeHtml(item.otherName || '')}" oninput="window.setOtherName(${item.id}, this.value)">` : '';
     div.innerHTML = `<div class="product-top">
-      <div style="display:flex;align-items:flex-start;gap:0.5rem;flex:1"><button class="del-item-btn" onclick="window.removeItem(${item.id})">✕</button><span class="product-name-text">${item.name}</span></div>
+      <div style="display:flex;align-items:flex-start;gap:0.5rem;flex:1"><button class="del-item-btn" onclick="window.removeItem(${item.id})">✕</button><span class="product-name-text">${escapeHtml(item.name)}</span></div>
       <span class="product-price-tag">${fmt(fromCents(item.priceCents))}</span></div>
       <div class="product-controls"><div class="split-group">
-        <button class="split-btn ${item.split==='him'?'s-him':''}" onclick="window.setSplit(${item.id},'him')">${names.him.split(' ')[0]}</button>
-        <button class="split-btn ${item.split==='her'?'s-her':''}" onclick="window.setSplit(${item.id},'her')">${names.her.split(' ')[0]}</button>
+        <button class="split-btn ${item.split==='him'?'s-him':''}" onclick="window.setSplit(${item.id},'him')">${escapeHtml(names.him.split(' ')[0])}</button>
+        <button class="split-btn ${item.split==='her'?'s-her':''}" onclick="window.setSplit(${item.id},'her')">${escapeHtml(names.her.split(' ')[0])}</button>
         <button class="split-btn ${item.split==='both'?'s-both':''}" onclick="window.setSplit(${item.id},'both')">÷2</button>
         <button class="split-btn ${item.split==='other'?'s-other':''}" onclick="window.setSplit(${item.id},'other')">👤 Emp.</button>
       </div></div>${otherInput}`;
@@ -1121,7 +1130,7 @@ function calcTotals(products) {
 window.renderSummary = function() {
   const names = getNames(); const { himC, herC, otherC } = calcTotals(AppState.currentProducts); const coupleC = himC + herC;
   const pills = [{ label: names.him, value: fmt(fromCents(himC)), color: 'var(--him)' }, { label: names.her, value: fmt(fromCents(herC)), color: 'var(--her)' }, { label: 'Casal', value: fmt(fromCents(coupleC)), color: 'var(--both)' }, otherC > 0 ? { label: 'Terceiros', value: fmt(fromCents(otherC)), color: 'var(--other)' } : null].filter(Boolean);
-  document.getElementById('summary-row').innerHTML = pills.map(p => `<div class="summary-pill"><div class="pill-label">${p.label}</div><div class="pill-value" style="color:${p.color}">${p.value}</div></div>`).join('');
+  document.getElementById('summary-row').innerHTML = pills.map(p => `<div class="summary-pill"><div class="pill-label">${escapeHtml(p.label)}</div><div class="pill-value" style="color:${p.color}">${p.value}</div></div>`).join('');
 };
 
 window.saveReceipt = async function() {
@@ -1182,7 +1191,7 @@ window.renderHistoryTabPills = function() {
   if (!container) return;
   container.innerHTML = tabs.map(t => {
     const isActive = tab === t.key;
-    return `<button class="tab-pill${isActive ? ' ' + t.activeClass : ''}" onclick="window.setHistoryTab('${t.key}')">${t.icon} ${t.label}</button>`;
+    return `<button class="tab-pill${isActive ? ' ' + t.activeClass : ''}" onclick="window.setHistoryTab('${t.key}')">${t.icon} ${escapeHtml(t.label)}</button>`;
   }).join('');
 };
 
@@ -1224,7 +1233,7 @@ window.renderHistory = function() {
       const itemRows = (r.items || []).map(item => {
         const iC = item.priceCents || 0;
         const badgeLabel = item.split === 'him' ? names.him.split(' ')[0] : item.split === 'her' ? names.her.split(' ')[0] : item.split === 'other' ? (item.otherName || '?') : '÷2';
-        return `<div class="receipt-item-row"><span style="flex:1">${item.name}</span><span class="item-badge">${badgeLabel}</span><span style="font-weight:700;color:var(--both)">${fmt(fromCents(iC))}</span></div>`;
+        return `<div class="receipt-item-row"><span style="flex:1">${escapeHtml(item.name)}</span><span class="item-badge">${escapeHtml(badgeLabel)}</span><span style="font-weight:700;color:var(--both)">${fmt(fromCents(iC))}</span></div>`;
       }).join('');
       const imgSrc = r.imageBase64 ? `data:${r.imageMime || 'image/jpeg'};base64,${r.imageBase64}` : '';
       
@@ -1242,9 +1251,9 @@ window.renderHistory = function() {
         ${syncBanner}
         <div class="receipt-head" onclick="window.toggleCard('${fid}')">
           <div style="min-width:0">
-            <div class="receipt-store">${r.store} ${statusBadge}</div>
-            <div class="receipt-date">${dateStr} • Por ${payerName}${methodStr}</div>
-            <div style="margin-top:0.25rem"><span class="category-badge">${cat}</span></div>
+            <div class="receipt-store">${escapeHtml(r.store)} ${statusBadge}</div>
+            <div class="receipt-date">${dateStr} • Por ${escapeHtml(payerName)}${escapeHtml(methodStr)}</div>
+            <div style="margin-top:0.25rem"><span class="category-badge">${escapeHtml(cat)}</span></div>
           </div>
           <div class="receipt-amounts">
             <div class="receipt-amount-item"><div class="amount-dot" style="background:var(--him)"></div><span>${fmt(fromCents(himC))}</span></div>
@@ -1282,7 +1291,7 @@ window.renderReportTabPills = function() {
   if (!container) return;
   container.innerHTML = tabs.map(t => {
     const isActive = tab === t.key;
-    return `<button class="tab-pill${isActive ? ' ' + t.activeClass : ''}" onclick="window.setReportTab('${t.key}')">${t.icon} ${t.label}</button>`;
+    return `<button class="tab-pill${isActive ? ' ' + t.activeClass : ''}" onclick="window.setReportTab('${t.key}')">${t.icon} ${escapeHtml(t.label)}</button>`;
   }).join('');
 };
 
@@ -1358,21 +1367,21 @@ window.renderReport = function() {
     });
     let settlementsHTML = ''; let settlements = fullList.filter(r => r.type === 'settlement');
     if (settlements.length > 0) {
-      let sRows = settlements.map(s => { const payerName = s.payer === 'him' ? names.him : names.her; const dStr = new Date(s.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }); return `<div class="store-row" style="border-left: 3px solid var(--both); padding-left:0.75rem;"><div style="flex:1"><div style="font-weight:700">Adiantamento / Pix de ${payerName}</div><div style="font-size:0.7rem; color:var(--muted2);">${dStr}</div></div><div style="text-align:right"><div style="color:var(--both); font-weight:800">+ ${fmt(fromCents(s.amountCents))}</div><button class="btn-ghost" style="border:none; padding:0.2rem; font-size:0.7rem; color:var(--muted); margin-top:0.25rem;" onclick="window.deleteReceipt('${s._fireId}')">Apagar Pix</button></div></div>`; }).join('');
+      let sRows = settlements.map(s => { const payerName = s.payer === 'him' ? names.him : names.her; const dStr = new Date(s.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }); return `<div class="store-row" style="border-left: 3px solid var(--both); padding-left:0.75rem;"><div style="flex:1"><div style="font-weight:700">Adiantamento / Pix de ${escapeHtml(payerName)}</div><div style="font-size:0.7rem; color:var(--muted2);">${dStr}</div></div><div style="text-align:right"><div style="color:var(--both); font-weight:800">+ ${fmt(fromCents(s.amountCents))}</div><button class="btn-ghost" style="border:none; padding:0.2rem; font-size:0.7rem; color:var(--muted); margin-top:0.25rem;" onclick="window.deleteReceipt('${s._fireId}')">Apagar Pix</button></div></div>`; }).join('');
       settlementsHTML = `<div class="card" style="margin-bottom:1rem; border-color:var(--both);"><div class="card-header" style="color:var(--both)">💸 Pagamentos Parciais (Já Realizados)</div><div style="padding:0.75rem 1.25rem 1rem 1.25rem;">${sRows}</div></div>`;
     }
     const btnHtml = `<button class="btn btn-primary btn-sm" onclick="window.openSettleModal()" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 0.4rem; font-weight:700; border-radius:var(--radius-sm);">💸 Abater Valor (Registrar Pix)</button>`;
     let finalHTML = '';
-    if (runningBalanceCents > 0) finalHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--both)"><div class="card-header" style="color:var(--both)">🤝 Falta Pagar (Nesta Fatura)</div><div style="padding:1.25rem;text-align:center"><div style="font-size:0.85rem;color:var(--muted2);margin-bottom:0.4rem">${names.her} deve pagar para ${names.him}</div><div style="font-size:2.2rem;font-weight:900;color:var(--both);letter-spacing:-1px;margin-bottom:1rem;">${fmt(fromCents(runningBalanceCents))}</div>${btnHtml}</div></div>`;
-    else if (runningBalanceCents < 0) finalHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--her)"><div class="card-header" style="color:var(--her)">🤝 Falta Pagar (Nesta Fatura)</div><div style="padding:1.25rem;text-align:center"><div style="font-size:0.85rem;color:var(--muted2);margin-bottom:0.4rem">${names.him} deve pagar para ${names.her}</div><div style="font-size:2.2rem;font-weight:900;color:var(--her);letter-spacing:-1px;margin-bottom:1rem;">${fmt(fromCents(Math.abs(runningBalanceCents)))}</div>${btnHtml}</div></div>`;
+    if (runningBalanceCents > 0) finalHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--both)"><div class="card-header" style="color:var(--both)">🤝 Falta Pagar (Nesta Fatura)</div><div style="padding:1.25rem;text-align:center"><div style="font-size:0.85rem;color:var(--muted2);margin-bottom:0.4rem">${escapeHtml(names.her)} deve pagar para ${escapeHtml(names.him)}</div><div style="font-size:2.2rem;font-weight:900;color:var(--both);letter-spacing:-1px;margin-bottom:1rem;">${fmt(fromCents(runningBalanceCents))}</div>${btnHtml}</div></div>`;
+    else if (runningBalanceCents < 0) finalHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--her)"><div class="card-header" style="color:var(--her)">🤝 Falta Pagar (Nesta Fatura)</div><div style="padding:1.25rem;text-align:center"><div style="font-size:0.85rem;color:var(--muted2);margin-bottom:0.4rem">${escapeHtml(names.him)} deve pagar para ${escapeHtml(names.her)}</div><div style="font-size:2.2rem;font-weight:900;color:var(--her);letter-spacing:-1px;margin-bottom:1rem;">${fmt(fromCents(Math.abs(runningBalanceCents)))}</div>${btnHtml}</div></div>`;
     else finalHTML = `<div class="card" style="margin-bottom:1rem"><div class="card-header">🤝 Falta Pagar (Nesta Fatura)</div><div style="padding:1.25rem;text-align:center;font-weight:700;color:var(--both)">Tudo quite nesta fatura! ✅<div style="margin-top:1rem">${btnHtml}</div></div></div>`;
     let listGastos = list.filter(r => r.type !== 'settlement' && r.type !== 'rollover');
     if (!listGastos.length && runningBalanceCents === 0 && settlements.length === 0) { container.innerHTML = `${finalHTML}<div class="empty"><div class="empty-icon">📊</div><p>Nenhum dado nesta fatura.</p></div>`; return; }
     const coupleC = himC + herC; const grandC = coupleC + otherC;
     const himPct = coupleC > 0 ? Math.round(himC / coupleC * 100) : 0; const herPct = 100 - himPct;
     let thirdPartyHTML = ''; let hasDebts = false; let debtsRows = '';
-    Object.entries(thirdPartyDebts.him).forEach(([name, amount]) => { hasDebts = true; debtsRows += `<div class="store-row"><span>${name} <small style="color:var(--muted2)">(deve a ${names.him})</small></span><span style="color:var(--him);font-weight:800">${fmt(fromCents(amount))}</span></div>`; });
-    Object.entries(thirdPartyDebts.her).forEach(([name, amount]) => { hasDebts = true; debtsRows += `<div class="store-row"><span>${name} <small style="color:var(--muted2)">(deve a ${names.her})</small></span><span style="color:var(--her);font-weight:800">${fmt(fromCents(amount))}</span></div>`; });
+    Object.entries(thirdPartyDebts.him).forEach(([name, amount]) => { hasDebts = true; debtsRows += `<div class="store-row"><span>${escapeHtml(name)} <small style="color:var(--muted2)">(deve a ${escapeHtml(names.him)})</small></span><span style="color:var(--him);font-weight:800">${fmt(fromCents(amount))}</span></div>`; });
+    Object.entries(thirdPartyDebts.her).forEach(([name, amount]) => { hasDebts = true; debtsRows += `<div class="store-row"><span>${escapeHtml(name)} <small style="color:var(--muted2)">(deve a ${escapeHtml(names.her)})</small></span><span style="color:var(--her);font-weight:800">${fmt(fromCents(amount))}</span></div>`; });
     if (hasDebts) { thirdPartyHTML = `<div class="card" style="margin-bottom:1rem;border-color:var(--other)"><div class="card-header" style="color:var(--other)">👥 A Receber de Terceiros (Em Aberto)</div><div style="padding:0 1.25rem">${debtsRows}</div></div>`; }
     let goalHTML = '';
     if (AppState.appSettings.monthlyGoal > 0) {
@@ -1380,8 +1389,8 @@ window.renderReport = function() {
       const color = pct >= 100 ? 'var(--her)' : pct >= 80 ? 'var(--other)' : 'var(--both)';
       goalHTML = `<div class="card" style="margin-bottom:1rem"><div class="card-header">🎯 Meta da Fatura</div><div class="goal-bar-wrap"><div class="goal-bar-labels"><span>${fmt(fromCents(globalCoupleC))} gastos</span><span style="color:${color};font-weight:800">${pct}%</span></div><div class="goal-bar-track"><div class="goal-bar-fill" style="width:${pct}%;background:${color}"></div></div><div style="font-size:0.72rem;color:var(--muted2);margin-top:0.4rem">Meta: ${fmt(fromCents(AppState.appSettings.monthlyGoal))}</div></div></div>`;
     }
-    const statsHTML = `<div class="stat-grid" style="margin-bottom:1rem"><div class="stat-card"><div class="stat-label">${names.him} consumiu</div><div class="stat-value" style="color:var(--him)">${fmt(fromCents(himC))}</div></div><div class="stat-card"><div class="stat-label">${names.her} consumiu</div><div class="stat-value" style="color:var(--her)">${fmt(fromCents(herC))}</div></div><div class="stat-card"><div class="stat-label">Total do casal</div><div class="stat-value" style="color:var(--both)">${fmt(fromCents(coupleC))}</div></div>${otherC > 0 ? `<div class="stat-card"><div class="stat-label">Terceiros</div><div class="stat-value" style="color:var(--other)">${fmt(fromCents(otherC))}</div></div>` : `<div class="stat-card"><div class="stat-label">Contas</div><div class="stat-value">${listGastos.length}</div></div>`}</div>`;
-    const donutSegs = [{ value: himC, color: 'var(--him)', label: names.him, val: fmt(fromCents(himC)) }, { value: herC, color: 'var(--her)', label: names.her, val: fmt(fromCents(herC)) }];
+    const statsHTML = `<div class="stat-grid" style="margin-bottom:1rem"><div class="stat-card"><div class="stat-label">${escapeHtml(names.him)} consumiu</div><div class="stat-value" style="color:var(--him)">${fmt(fromCents(himC))}</div></div><div class="stat-card"><div class="stat-label">${escapeHtml(names.her)} consumiu</div><div class="stat-value" style="color:var(--her)">${fmt(fromCents(herC))}</div></div><div class="stat-card"><div class="stat-label">Total do casal</div><div class="stat-value" style="color:var(--both)">${fmt(fromCents(coupleC))}</div></div>${otherC > 0 ? `<div class="stat-card"><div class="stat-label">Terceiros</div><div class="stat-value" style="color:var(--other)">${fmt(fromCents(otherC))}</div></div>` : `<div class="stat-card"><div class="stat-label">Contas</div><div class="stat-value">${listGastos.length}</div></div>`}</div>`;
+    const donutSegs = [{ value: himC, color: 'var(--him)', label: escapeHtml(names.him), val: fmt(fromCents(himC)) }, { value: herC, color: 'var(--her)', label: escapeHtml(names.her), val: fmt(fromCents(herC)) }];
     if (otherC > 0) donutSegs.push({ value: otherC, color: 'var(--other)', label: 'Terceiros', val: fmt(fromCents(otherC)) });
     const donutHTML = `<div class="card" style="margin-bottom:1rem"><div class="card-header">🍩 Proporção de gastos</div><div class="donut-wrap">${buildDonutSVG(donutSegs)}<div class="donut-legend">${donutSegs.map(s => `<div class="donut-legend-item"><div class="donut-legend-dot" style="background:${s.color}"></div><span class="donut-legend-label">${s.label}</span><span class="donut-legend-value" style="color:${s.color}">${s.val}</span></div>`).join('')}<div class="donut-legend-item" style="margin-top:0.25rem;padding-top:0.5rem;border-top:1px solid var(--border)"><span class="donut-legend-label">Proporção</span><span class="donut-legend-value" style="color:var(--muted2)">${himPct}% / ${herPct}%</span></div></div></div></div>`;
     const catRows = Object.entries(categoryMap).sort((a, b) => b[1].total - a[1].total).map(([cat, val]) => { 
@@ -1389,13 +1398,13 @@ window.renderReport = function() {
       return `
         <div class="cat-row" style="flex-direction:column; align-items:stretch; gap:0.4rem; padding: 0.75rem 0;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:0.82rem;font-weight:700">${catLabel(cat)}</span>
+            <span style="font-size:0.82rem;font-weight:700">${escapeHtml(catLabel(cat))}</span>
             <span class="cat-row-value" style="font-size:0.9rem">${fmt(fromCents(val.total))}</span>
           </div>
           <div class="cat-row-bar" style="margin: 0;"><div class="cat-row-fill" style="width:${pctBar}%"></div></div>
           <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--muted2);">
-            <span>${names.him}: <strong style="color:var(--him)">${fmt(fromCents(val.him))}</strong></span>
-            <span>${names.her}: <strong style="color:var(--her)">${fmt(fromCents(val.her))}</strong></span>
+            <span>${escapeHtml(names.him)}: <strong style="color:var(--him)">${fmt(fromCents(val.him))}</strong></span>
+            <span>${escapeHtml(names.her)}: <strong style="color:var(--her)">${fmt(fromCents(val.her))}</strong></span>
           </div>
         </div>`; 
     }).join('');
@@ -1409,8 +1418,8 @@ window.renderReport = function() {
           <div style="display:flex;align-items:flex-start;gap:0.5rem;flex:1;min-width:0">
             <div style="width:10px;height:10px;border-radius:50%;background:${dotColor};flex-shrink:0;margin-top:0.3rem"></div>
             <div style="min-width:0">
-              <div class="store-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${store}</div>
-              <div style="font-size:0.68rem;color:var(--muted2);margin-top:0.1rem">${catLabel(v.category)}</div>
+              <div class="store-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(store)}</div>
+              <div style="font-size:0.68rem;color:var(--muted2);margin-top:0.1rem">${escapeHtml(catLabel(v.category))}</div>
             </div>
           </div>
           <div class="store-amounts" style="flex-shrink:0">
@@ -1424,14 +1433,14 @@ window.renderReport = function() {
 
     const storeRows = (
       renderStoreSubList(allStores.filter(x => x[1].himC > 0 && x[1].herC > 0), 'Casal', '👩‍❤️‍👨') +
-      renderStoreSubList(allStores.filter(x => x[1].himC > 0 && x[1].herC === 0), names.him, '🔵') +
-      renderStoreSubList(allStores.filter(x => x[1].herC > 0 && x[1].himC === 0), names.her, '🔴')
+      renderStoreSubList(allStores.filter(x => x[1].himC > 0 && x[1].herC === 0), escapeHtml(names.him), '🔵') +
+      renderStoreSubList(allStores.filter(x => x[1].herC > 0 && x[1].himC === 0), escapeHtml(names.her), '🔴')
     ) || '<div style="padding:1rem 0;color:var(--muted);text-align:center;font-size:0.9rem">Nenhum gasto registrado.</div>';
-    const receiptRows = [...listGastos].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(r => { const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0); const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0); const d = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }); return `<div class="store-row" style="${r.status === 'paid' ? 'opacity:0.6' : ''}"><span>${d} — ${r.store} <span class="category-badge">${catLabel(r.category || 'outros')}</span></span><div class="store-amounts"><span style="color:var(--him)">${fmt(fromCents(rHimC))}</span><span style="color:var(--her)">${fmt(fromCents(rHerC))}</span></div></div>`; }).join('');
+    const receiptRows = [...listGastos].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(r => { const rHimC = r.himCents !== undefined ? r.himCents : cents(r.himTotal || 0); const rHerC = r.herCents !== undefined ? r.herCents : cents(r.herTotal || 0); const d = new Date(r.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }); return `<div class="store-row" style="${r.status === 'paid' ? 'opacity:0.6' : ''}"><span>${d} — ${escapeHtml(r.store)} <span class="category-badge">${escapeHtml(catLabel(r.category || 'outros'))}</span></span><div class="store-amounts"><span style="color:var(--him)">${fmt(fromCents(rHimC))}</span><span style="color:var(--her)">${fmt(fromCents(rHerC))}</span></div></div>`; }).join('');
     const exportBtn = `<div style="margin-bottom:1rem;display:flex;justify-content:flex-end"><button class="btn btn-ghost btn-sm" onclick="window.exportCSV()">📥 Exportar CSV desta Fatura</button></div>`;
     let topStoreTitle = '🏪 Onde vocês mais gastaram';
-    if (reportTab === 'him') topStoreTitle = `🏪 Onde ${names.him} mais gastou`;
-    else if (reportTab === 'her') topStoreTitle = `🏪 Onde ${names.her} mais gastou`;
+    if (reportTab === 'him') topStoreTitle = `🏪 Onde ${escapeHtml(names.him)} mais gastou`;
+    else if (reportTab === 'her') topStoreTitle = `🏪 Onde ${escapeHtml(names.her)} mais gastou`;
     else if (reportTab === 'all') topStoreTitle = '🏪 Onde mais foi gasto';
     container.innerHTML = `${finalHTML}${settlementsHTML}${thirdPartyHTML}${goalHTML}${statsHTML}${donutHTML}${categoryHTML}<div class="card" style="margin-bottom:1rem"><div class="card-header">${topStoreTitle}</div><div style="padding:0 1.25rem">${storeRows}</div></div><div class="card" style="margin-bottom:1rem"><div class="card-header">🧾 ${listGastos.length} contas na fatura</div><div style="padding:0 1.25rem">${receiptRows}</div></div>${exportBtn}`;
   } catch (error) { console.error(error); }
@@ -1566,7 +1575,7 @@ window.renderGoals = function() {
       personContainer.innerHTML = `
         <div style="margin-bottom:1rem">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem">
-            <span style="font-size:0.88rem;font-weight:600;min-width:120px;color:var(--him)">👤 ${names.him}</span>
+            <span style="font-size:0.88rem;font-weight:600;min-width:120px;color:var(--him)">👤 ${escapeHtml(names.him)}</span>
             <div style="display:flex;align-items:center;gap:0.4rem;flex:1">
               <span style="font-size:0.8rem;color:var(--muted2)">R$</span>
               <input class="field-input" type="number" step="0.01" min="0" placeholder="Sem limite"
@@ -1578,7 +1587,7 @@ window.renderGoals = function() {
         </div>
         <div style="margin-bottom:0.5rem">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:0.75rem">
-            <span style="font-size:0.88rem;font-weight:600;min-width:120px;color:var(--her)">👤 ${names.her}</span>
+            <span style="font-size:0.88rem;font-weight:600;min-width:120px;color:var(--her)">👤 ${escapeHtml(names.her)}</span>
             <div style="display:flex;align-items:center;gap:0.4rem;flex:1">
               <span style="font-size:0.8rem;color:var(--muted2)">R$</span>
               <input class="field-input" type="number" step="0.01" min="0" placeholder="Sem limite"
