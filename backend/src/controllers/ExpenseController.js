@@ -7,6 +7,7 @@
  * Se a regra mudar, apenas o Service precisa ser alterado.
  */
 const expenseService = require('../services/ExpenseService');
+const { logAudit } = require('../services/AuditService');
 
 class ExpenseController {
   // ──────────────────────────────────────────────
@@ -63,8 +64,19 @@ class ExpenseController {
   async clearAll(req, res) {
     try {
       await expenseService.clearAllReceipts();
+      await logAudit('EXPENSE_CLEAR_ALL', {
+        actor: req.user?.who || 'unknown',
+        ip: req.ip,
+        status: 'SUCCESS',
+      });
       res.status(204).send();
     } catch (e) {
+      await logAudit('EXPENSE_CLEAR_ALL', {
+        actor: req.user?.who || 'unknown',
+        ip: req.ip,
+        status: 'FAILED',
+        details: { error: e.message },
+      });
       res.status(500).json({ error: e.message });
     }
   }
@@ -72,8 +84,20 @@ class ExpenseController {
   async closeCycle(req, res) {
     try {
       const result = await expenseService.closeCycle(req.body);
+      await logAudit('EXPENSE_CLOSE_CYCLE', {
+        actor: req.user?.who || req.body.payer || 'unknown',
+        ip: req.ip,
+        status: 'SUCCESS',
+        details: { payer: req.body.payer },
+      });
       res.json(result);
     } catch (e) {
+      await logAudit('EXPENSE_CLOSE_CYCLE', {
+        actor: req.user?.who || req.body.payer || 'unknown',
+        ip: req.ip,
+        status: 'FAILED',
+        details: { error: e.message },
+      });
       res.status(400).json({ error: e.message });
     }
   }
@@ -94,8 +118,19 @@ class ExpenseController {
   async saveSettings(req, res) {
     try {
       await expenseService.saveSettings(req.body);
+      await logAudit('SETTINGS_UPDATE', {
+        actor: req.user?.who || 'unknown',
+        ip: req.ip,
+        status: 'SUCCESS',
+      });
       res.json({ success: true });
     } catch (e) {
+      await logAudit('SETTINGS_UPDATE', {
+        actor: req.user?.who || 'unknown',
+        ip: req.ip,
+        status: 'FAILED',
+        details: { error: e.message },
+      });
       res.status(400).json({ error: e.message });
     }
   }

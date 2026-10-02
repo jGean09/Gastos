@@ -1,6 +1,7 @@
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const dotenv = require('dotenv');
+const { logger } = require('./logger');
 
 dotenv.config();
 
@@ -18,9 +19,9 @@ class FirebaseApp {
         initializeApp(); // Usa as credenciais padrão do ambiente
       }
       this.db = getFirestore();
-      console.log('✅ Firebase Admin inicializado com sucesso.');
+      logger.info('✅ Firebase Admin inicializado com sucesso.');
     } catch (error) {
-      console.error('❌ Erro ao inicializar o Firebase Admin:', error.message);
+      logger.error({ err: error.message }, '❌ Erro ao inicializar o Firebase Admin');
       process.exit(1);
     }
     FirebaseApp._instance = this;
